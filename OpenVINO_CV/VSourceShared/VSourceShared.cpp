@@ -7,7 +7,7 @@
 //  output args
 
 
-#include <string>
+//#include <string>
 #include <stdio.h>
 #include <iostream>
 #include <algorithm>
@@ -17,6 +17,7 @@
 #include <Windows.h>
 #include <signal.h>
 #include "OpenVINO_CV.h"
+//#include <cstring>
 
 //窗体标题
 #define     WINDOW_TITLE    "source"
@@ -30,7 +31,7 @@ bool isRunning = true;
 DEFINE_string(i, "cam:0", "输入视频或图片源路径");
 DEFINE_string(mn, "source.bin", "内存共享名称");
 DEFINE_string(size, "640,480", "输出尺寸大小");
-DEFINE_bool(imshow, true, "是否显示视频源");
+DEFINE_bool(imshow, false, "是否显示视频源");
 DEFINE_double(r, 0.24, "用于AI分析的源比例");
 DEFINE_string(rmn, "source.ai.bin", "用于AI分析的内存共享名称");
 
@@ -79,14 +80,16 @@ static bool CreateOnlyWriteMapFile(HANDLE &handle, LPVOID &buffer, uint size, co
 
 //写入共享内存
 //返回写入耗时时间ms
-static double WriteMapFile(HANDLE &handle, LPVOID &buffer, const SourceMapFileInfo *info, const cv::Mat frame)
+static double WriteMapFile(LPVOID &buffer, const SourceMapFileInfo *info, const cv::Mat frame)
 {
-    if (handle == NULL || buffer == NULL) return 0.0;
-
     auto t0 = std::chrono::high_resolution_clock::now();
-    
-    std::copy((uint8_t*)info, (uint8_t*)info + sizeof(info), (uint8_t*)buffer);
-    std::copy((uint8_t*)frame.data, (uint8_t*)frame.dataend, (uint8_t*)buffer + sizeof(info));
+
+    static int offset = sizeof(SourceMapFileInfo);
+
+    std::copy((uint8_t*)info, (uint8_t*)info + offset, (uint8_t *)buffer);
+    std::copy((uint8_t*)frame.data, (uint8_t*)frame.dataend, (uint8_t*)buffer + offset);
+
+    //std::cout << "FFw:" << info->width << " h:" << info->height << " c:" << info->channels << " t:" << info->type << " size:" << offset << std::endl;
 
     auto t1 = std::chrono::high_resolution_clock::now();
     double decode_time = std::chrono::duration_cast<ms>(t1 - t0).count();
@@ -154,7 +157,6 @@ int main(int argc, char** argv)
         //cv::setMouseCallback("source", onMouseEventHandler, 0);
     }
 
-
     int width = capture.get(cv::CAP_PROP_FRAME_WIDTH);
     int height = capture.get(cv::CAP_PROP_FRAME_HEIGHT);
     int count = capture.get(cv::CAP_PROP_FRAME_COUNT);
@@ -166,14 +168,17 @@ int main(int argc, char** argv)
     std::cout << "Video FPS:" << fps << std::endl;
     cv::Size dsize(width * FLAGS_r, height * FLAGS_r);
     
+    uint32_t fid = 0;
+    bool isLastFrame = false;
+    cv::Mat srcFrame, aiFrame;
+
     SourceMapFileInfo srcHeadInfo, aiHeadInfo;
     LPVOID srcBuffer = NULL, aiBuffer = NULL;
     HANDLE srcMapFile = NULL, aiMapFile = NULL;
+
     CreateOnlyWriteMapFile(srcMapFile, srcBuffer, SOURCE_BUFFER_SIZE, FLAGS_mn.c_str());
     CreateOnlyWriteMapFile(aiMapFile, aiBuffer, SOURCE_BUFFER_SIZE * FLAGS_r, FLAGS_rmn.c_str());
-
-    cv::Mat srcFrame, aiFrame;
-    bool isLastFrame = false;
+    
     while (true)
     {
         if (!isRunning) break;
@@ -197,26 +202,28 @@ int main(int argc, char** argv)
         double decode_time = std::chrono::duration_cast<ms>(t1 - t0).count();
         std::cout << "\33[2K\r" << "Read/Decode Frame:" << decode_time << "ms";
 
+        auto t2 = std::chrono::high_resolution_clock::now();
         //Write To Memory
         if (srcMapFile != NULL && srcBuffer != NULL)
         {
-            srcHeadInfo.width = srcFrame.cols;
-            srcHeadInfo.height = srcFrame.rows;
-            srcHeadInfo.channls = srcFrame.channels();
+            srcHeadInfo.fid = fid;
+            srcHeadInfo << srcFrame;
 
-            double decode_time = WriteMapFile(srcMapFile, srcBuffer, &srcHeadInfo, srcFrame);
-            std::cout << "\t" << "Write To Memory:" << decode_time << "ms " << srcFrame.rows * srcFrame.cols * srcFrame.channels() << "Bytes";
+            double decode_time = WriteMapFile(srcBuffer, &srcHeadInfo, srcFrame);
+            //std::cout << "\t" << "Write To Memory:" << decode_time << "ms " << srcFrame.rows * srcFrame.cols * srcFrame.channels() << "Bytes";
         }
         if (aiMapFile != NULL && aiBuffer != NULL)
         {
             cv::resize(srcFrame, aiFrame, dsize);
-            aiHeadInfo.width = aiFrame.cols;
-            aiHeadInfo.height = aiFrame.rows;
-            aiHeadInfo.channls = aiFrame.channels();
+            aiHeadInfo.fid = fid;
+            aiHeadInfo << aiFrame;
 
-            double decode_time = WriteMapFile(srcMapFile, srcBuffer, &aiHeadInfo, aiFrame);
-            std::cout << "\t" << "Write To Memory:" << decode_time << "ms " << aiFrame.rows * aiFrame.cols * aiFrame.channels() << "Bytes";
+            double decode_time = WriteMapFile(aiBuffer, &aiHeadInfo, aiFrame);
+            //std::cout << "\t" << "Write To Memory:" << decode_time << "ms " << aiFrame.rows * aiFrame.cols * aiFrame.channels() << "Bytes";
         }
+        auto t3 = std::chrono::high_resolution_clock::now();
+        double write_time = std::chrono::duration_cast<ms>(t3 - t2).count();
+        std::cout << "\tWrite To Memory:" << write_time << "ms";
 
         const int key = cv::waitKey(DELAY) & 0xFF;
         if (key == 'c') FLAGS_imshow ^= true;
@@ -224,6 +231,7 @@ int main(int argc, char** argv)
         if (FLAGS_imshow)
             cv::imshow(WINDOW_TITLE, srcFrame);
 
+        fid++;
         if (isLastFrame) break;
     }
 

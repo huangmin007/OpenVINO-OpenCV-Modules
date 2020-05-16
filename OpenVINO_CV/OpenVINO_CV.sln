@@ -3,9 +3,16 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.29519.181
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OpenVINO_CV", "VSourceShared\VSourceShared.vcxproj", "{AA7E28D4-C921-41F1-81DD-894741350806}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "VSourceShared", "VSourceShared\VSourceShared.vcxproj", "{AA7E28D4-C921-41F1-81DD-894741350806}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OpenVINO_CV_Lib_Static", "OpenVINO_CV_Lib_Static\OpenVINO_CV_Lib_Static.vcxproj", "{49070D98-5636-4CE1-BBB9-BC2F7F1A433D}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OpenPoseModel", "OpenPoseModel\OpenPoseModel.vcxproj", "{C372F419-5DC6-418B-9FD6-B0229E8D603F}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{C5CA991A-F560-4BFE-94A1-C86D7BC81FED}"
+	ProjectSection(SolutionItems) = preProject
+		Readme.md = Readme.md
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -31,6 +38,14 @@ Global
 		{49070D98-5636-4CE1-BBB9-BC2F7F1A433D}.Release|x64.Build.0 = Release|x64
 		{49070D98-5636-4CE1-BBB9-BC2F7F1A433D}.Release|x86.ActiveCfg = Release|Win32
 		{49070D98-5636-4CE1-BBB9-BC2F7F1A433D}.Release|x86.Build.0 = Release|Win32
+		{C372F419-5DC6-418B-9FD6-B0229E8D603F}.Debug|x64.ActiveCfg = Debug|x64
+		{C372F419-5DC6-418B-9FD6-B0229E8D603F}.Debug|x64.Build.0 = Debug|x64
+		{C372F419-5DC6-418B-9FD6-B0229E8D603F}.Debug|x86.ActiveCfg = Debug|Win32
+		{C372F419-5DC6-418B-9FD6-B0229E8D603F}.Debug|x86.Build.0 = Debug|Win32
+		{C372F419-5DC6-418B-9FD6-B0229E8D603F}.Release|x64.ActiveCfg = Release|x64
+		{C372F419-5DC6-418B-9FD6-B0229E8D603F}.Release|x64.Build.0 = Release|x64
+		{C372F419-5DC6-418B-9FD6-B0229E8D603F}.Release|x86.ActiveCfg = Release|Win32
+		{C372F419-5DC6-418B-9FD6-B0229E8D603F}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
