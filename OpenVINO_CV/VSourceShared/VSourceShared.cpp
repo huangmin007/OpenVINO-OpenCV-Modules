@@ -6,7 +6,7 @@
 //  run args
 //  output args
 
-#include <iostream>
+
 #include <string>
 #include <stdio.h>
 #include <iostream>
@@ -14,12 +14,18 @@
 #include <errno.h>
 #include <gflags/gflags.h>
 #include <opencv2/opencv.hpp>
-
 #include <Windows.h>
+#include <signal.h>
+#include "OpenVINO_CV.h"
 
+//窗体标题
 #define     WINDOW_TITLE    "source"
+//delay
 #define     DELAY           30
+//分配源共享内存大小
 #define     SOURCE_BUFFER_SIZE      1024 * 1024 * 16
+
+bool isRunning = true;
 
 DEFINE_string(i, "cam:0", "输入视频或图片源路径");
 DEFINE_string(mn, "source.bin", "内存共享名称");
@@ -28,20 +34,13 @@ DEFINE_bool(imshow, true, "是否显示视频源");
 DEFINE_double(r, 0.24, "用于AI分析的源比例");
 DEFINE_string(rmn, "source.ai.bin", "用于AI分析的内存共享名称");
 
-
-typedef std::chrono::duration<double, std::ratio<1, 1000>> ms;
-
-struct MapFileHead
+BOOL WINAPI HandlerRoutine(DWORD key)
 {
-    int width;
-    int height;
-    int channls;
-    int type;
-    int reserve0 = 0;
-    int reserve1 = 0;
-    int reserve2 = 0;
-    int reserve3 = 0;
-};
+    if (key == CTRL_C_EVENT)
+        isRunning = false;
+
+    return true;
+}
 
 void onMouseEventHandler(int event, int x, int y, int flags, void* ustc)
 {
@@ -74,17 +73,20 @@ static bool CreateOnlyWriteMapFile(HANDLE &handle, LPVOID &buffer, uint size, co
         return false;
     }
 
+    std::cout << "[Info]创建共享内存块 " << name << " 完成，大小：" << size << "Bytes" << std::endl;
     return true;
 }
 
 //写入共享内存
 //返回写入耗时时间ms
-static double WriteMapFile(HANDLE &handle, LPVOID &buffer, cv::Mat frame)
+static double WriteMapFile(HANDLE &handle, LPVOID &buffer, const SourceMapFileInfo *info, const cv::Mat frame)
 {
     if (handle == NULL || buffer == NULL) return 0.0;
 
     auto t0 = std::chrono::high_resolution_clock::now();
-    std::copy((uint8_t*)frame.data, (uint8_t*)frame.dataend, (uint8_t*)buffer);
+    
+    std::copy((uint8_t*)info, (uint8_t*)info + sizeof(info), (uint8_t*)buffer);
+    std::copy((uint8_t*)frame.data, (uint8_t*)frame.dataend, (uint8_t*)buffer + sizeof(info));
 
     auto t1 = std::chrono::high_resolution_clock::now();
     double decode_time = std::chrono::duration_cast<ms>(t1 - t0).count();
@@ -92,8 +94,11 @@ static double WriteMapFile(HANDLE &handle, LPVOID &buffer, cv::Mat frame)
     return decode_time;
 }
 
+
 int main(int argc, char** argv)
 {
+    //SetConsoleCtrlHandler(HandlerRoutine, TRUE);
+    
     google::ParseCommandLineFlags(&argc, &argv, false);
     std::cout << "Video Source:" << FLAGS_i << std::endl;
     
@@ -149,6 +154,7 @@ int main(int argc, char** argv)
         //cv::setMouseCallback("source", onMouseEventHandler, 0);
     }
 
+
     int width = capture.get(cv::CAP_PROP_FRAME_WIDTH);
     int height = capture.get(cv::CAP_PROP_FRAME_HEIGHT);
     int count = capture.get(cv::CAP_PROP_FRAME_COUNT);
@@ -159,8 +165,8 @@ int main(int argc, char** argv)
     std::cout << "Video Format:" << format << std::endl;
     std::cout << "Video FPS:" << fps << std::endl;
     cv::Size dsize(width * FLAGS_r, height * FLAGS_r);
-
-
+    
+    SourceMapFileInfo srcHeadInfo, aiHeadInfo;
     LPVOID srcBuffer = NULL, aiBuffer = NULL;
     HANDLE srcMapFile = NULL, aiMapFile = NULL;
     CreateOnlyWriteMapFile(srcMapFile, srcBuffer, SOURCE_BUFFER_SIZE, FLAGS_mn.c_str());
@@ -170,6 +176,7 @@ int main(int argc, char** argv)
     bool isLastFrame = false;
     while (true)
     {
+        if (!isRunning) break;
         auto t0 = std::chrono::high_resolution_clock::now();
 
         if (!capture.read(srcFrame))
@@ -180,7 +187,7 @@ int main(int argc, char** argv)
             }
             else
             {
-                std::cout << "[Error]获取视频帧错误" << FLAGS_i << std::endl;
+                std::cout << "[Error]读取视频帧错误" << FLAGS_i << std::endl;
                 system("pasue");
                 return EXIT_FAILURE;
             }
@@ -188,18 +195,26 @@ int main(int argc, char** argv)
 
         auto t1 = std::chrono::high_resolution_clock::now();
         double decode_time = std::chrono::duration_cast<ms>(t1 - t0).count();
-        std::cout << "\33[2K\r" << "Decode Frame:" << decode_time << "ms";
+        std::cout << "\33[2K\r" << "Read/Decode Frame:" << decode_time << "ms";
 
         //Write To Memory
         if (srcMapFile != NULL && srcBuffer != NULL)
         {
-            double decode_time = WriteMapFile(srcMapFile, srcBuffer, srcFrame);
+            srcHeadInfo.width = srcFrame.cols;
+            srcHeadInfo.height = srcFrame.rows;
+            srcHeadInfo.channls = srcFrame.channels();
+
+            double decode_time = WriteMapFile(srcMapFile, srcBuffer, &srcHeadInfo, srcFrame);
             std::cout << "\t" << "Write To Memory:" << decode_time << "ms " << srcFrame.rows * srcFrame.cols * srcFrame.channels() << "Bytes";
         }
         if (aiMapFile != NULL && aiBuffer != NULL)
         {
             cv::resize(srcFrame, aiFrame, dsize);
-            double decode_time = WriteMapFile(srcMapFile, srcBuffer, aiFrame);
+            aiHeadInfo.width = aiFrame.cols;
+            aiHeadInfo.height = aiFrame.rows;
+            aiHeadInfo.channls = aiFrame.channels();
+
+            double decode_time = WriteMapFile(srcMapFile, srcBuffer, &aiHeadInfo, aiFrame);
             std::cout << "\t" << "Write To Memory:" << decode_time << "ms " << aiFrame.rows * aiFrame.cols * aiFrame.channels() << "Bytes";
         }
 

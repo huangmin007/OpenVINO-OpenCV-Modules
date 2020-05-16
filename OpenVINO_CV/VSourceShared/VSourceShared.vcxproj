@@ -75,16 +75,16 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <LibraryPath>$(INTEL_OPENVINO_DIR)\opencv\lib;..\..\Libraries\gflags-2.2.2\lib\Debug;$(LibraryPath)</LibraryPath>
-    <IncludePath>$(INTEL_OPENVINO_DIR)\opencv\include;..\..\Libraries\gflags-2.2.2\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(INTEL_OPENVINO_DIR)\opencv\lib;..\Libraries\gflags-2.2.2\lib\Debug;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(INTEL_OPENVINO_DIR)\opencv\include;..\OpenVINO_CV_Lib_Static;..\Libraries\gflags-2.2.2\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(INTEL_OPENVINO_DIR)\opencv\include;..\..\Libraries\gflags-2.2.2\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(INTEL_OPENVINO_DIR)\opencv\lib;..\..\Libraries\gflags-2.2.2\lib\Release;$(LibraryPath)</LibraryPath>
+    <IncludePath>..\OpenVINO_CV_Lib_Static;$(INTEL_OPENVINO_DIR)\opencv\include;..\Libraries\gflags-2.2.2\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(INTEL_OPENVINO_DIR)\opencv\lib;..\Libraries\gflags-2.2.2\lib\Release;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -154,6 +154,11 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="VSourceShared.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\OpenVINO_CV_Lib_Static\OpenVINO_CV_Lib_Static.vcxproj">
+      <Project>{49070d98-5636-4ce1-bbb9-bc2f7f1a433d}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
