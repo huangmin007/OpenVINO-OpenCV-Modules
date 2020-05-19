@@ -18,5 +18,34 @@
     <ClCompile Include="OpenPoseModel.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="render_human_pose.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="human_pose_estimator.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="peak.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="human_pose.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="render_human_pose.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="human_pose_estimator.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="peak.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="human_pose.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="args.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

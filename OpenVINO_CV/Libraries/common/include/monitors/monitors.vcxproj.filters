@@ -1,0 +1,42 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="D:\Program Files (x86)\IntelSWTools\openvino\deployment_tools\inference_engine\demos\common\monitors\presenter.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Program Files (x86)\IntelSWTools\openvino\deployment_tools\inference_engine\demos\common\monitors\cpu_monitor.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Program Files (x86)\IntelSWTools\openvino\deployment_tools\inference_engine\demos\common\monitors\memory_monitor.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Program Files (x86)\IntelSWTools\openvino\deployment_tools\inference_engine\demos\common\monitors\query_wrapper.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="D:\Program Files (x86)\IntelSWTools\openvino\deployment_tools\inference_engine\demos\common\monitors\presenter.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Program Files (x86)\IntelSWTools\openvino\deployment_tools\inference_engine\demos\common\monitors\cpu_monitor.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Program Files (x86)\IntelSWTools\openvino\deployment_tools\inference_engine\demos\common\monitors\memory_monitor.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Program Files (x86)\IntelSWTools\openvino\deployment_tools\inference_engine\demos\common\monitors\query_wrapper.h">
+      <Filter>include</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="D:\Program Files (x86)\IntelSWTools\openvino\deployment_tools\inference_engine\demos\common\monitors\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="include">
+      <UniqueIdentifier>{1A90F0A9-33C1-3CE9-A10F-15CCC147D71D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src">
+      <UniqueIdentifier>{E9F45658-7D06-37E2-8FD2-1753208CB134}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

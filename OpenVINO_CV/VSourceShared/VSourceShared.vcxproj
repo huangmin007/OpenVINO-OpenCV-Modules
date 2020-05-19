@@ -43,14 +43,14 @@
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v142</PlatformToolset>
-    <CharacterSet>Unicode</CharacterSet>
+    <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>Unicode</CharacterSet>
+    <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -75,16 +75,16 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <LibraryPath>$(INTEL_OPENVINO_DIR)\opencv\lib;..\Libraries\gflags-2.2.2\lib\Debug;$(LibraryPath)</LibraryPath>
-    <IncludePath>$(INTEL_OPENVINO_DIR)\opencv\include;..\OpenVINO_CV_Lib_Static;..\Libraries\gflags-2.2.2\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(INTEL_OPENVINO_DIR)\opencv\lib;..\Libraries\log4cplus-2.0.4\lib\Debug;..\Libraries\gflags-2.2.2\lib\Debug;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(INTEL_OPENVINO_DIR)\opencv\include;..\OpenVINO_CV_Lib_Static;..\Libraries\common\include;..\Libraries\gflags-2.2.2\include;..\Libraries\log4cplus-2.0.4\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(INTEL_OPENVINO_DIR)\opencv\include;..\OpenVINO_CV_Lib_Static;..\Libraries\gflags-2.2.2\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(INTEL_OPENVINO_DIR)\opencv\lib;..\Libraries\gflags-2.2.2\lib\Release;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(INTEL_OPENVINO_DIR)\opencv\include;..\OpenVINO_CV_Lib_Static;..\Libraries\log4cplus-2.0.4\include;..\Libraries\gflags-2.2.2\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(INTEL_OPENVINO_DIR)\opencv\lib;..\Libraries\log4cplus-2.0.4\lib\Release;..\Libraries\gflags-2.2.2\lib\Release;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -112,7 +112,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>gflags_static_debug.lib;shlwapi.lib;opencv_core430d.lib;opencv_videoio430d.lib;opencv_highgui430d.lib;opencv_imgproc430d.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>gflags_nothreads_static.lib;shlwapi.lib;log4cplusD.lib;opencv_core430d.lib;opencv_videoio430d.lib;opencv_highgui430d.lib;opencv_imgproc430d.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -149,7 +149,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>gflags_static.lib;shlwapi.lib;opencv_core430.lib;opencv_videoio430.lib;opencv_highgui430.lib;opencv_imgproc430.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>gflags_nothreads_static.lib;shlwapi.lib;log4cplus.lib;opencv_core430.lib;opencv_videoio430.lib;opencv_highgui430.lib;opencv_imgproc430.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -159,6 +159,9 @@
     <ProjectReference Include="..\OpenVINO_CV_Lib_Static\OpenVINO_CV_Lib_Static.vcxproj">
       <Project>{49070d98-5636-4ce1-bbb9-bc2f7f1a433d}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="args.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

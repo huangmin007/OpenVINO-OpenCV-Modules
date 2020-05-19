@@ -1,187 +1,142 @@
 ﻿// VSourceShared.cpp : 此文件包含 "main" 函数。程序执行将在此处开始并结束。
 //
 
-// 启动参数设计
+
 //  input args -i url:aa  -i cam:0
 //  run args
 //  output args
 
 
-//#include <string>
+#include <string>
+#include <sstream>
 #include <stdio.h>
 #include <iostream>
 #include <algorithm>
 #include <errno.h>
-#include <gflags/gflags.h>
-#include <opencv2/opencv.hpp>
+//#include <opencv2/opencv.hpp>
 #include <Windows.h>
-#include <signal.h>
+
+#include "args.hpp"
 #include "OpenVINO_CV.h"
-//#include <cstring>
+#include "LoggerConfig.h"
 
-//窗体标题
-#define     WINDOW_TITLE    "source"
-//delay
-#define     DELAY           30
-//分配源共享内存大小
-#define     SOURCE_BUFFER_SIZE      1024 * 1024 * 16
 
-bool isRunning = true;
-
-DEFINE_string(i, "cam:0", "输入视频或图片源路径");
-DEFINE_string(mn, "source.bin", "内存共享名称");
-DEFINE_string(size, "640,480", "输出尺寸大小");
-DEFINE_bool(imshow, false, "是否显示视频源");
-DEFINE_double(r, 0.24, "用于AI分析的源比例");
-DEFINE_string(rmn, "source.ai.bin", "用于AI分析的内存共享名称");
-
-BOOL WINAPI HandlerRoutine(DWORD key)
-{
-    if (key == CTRL_C_EVENT)
-        isRunning = false;
-
-    return true;
-}
-
-void onMouseEventHandler(int event, int x, int y, int flags, void* ustc)
-{
-    std::cout << "mouse event::" << event << std::endl;
-    if (event == cv::EVENT_LBUTTONDOWN)
-    {
-        
-    }
-}
-
-//创建只写的内存共享文件
-//创建成功 返回 true
-static bool CreateOnlyWriteMapFile(HANDLE &handle, LPVOID &buffer, uint size, const char *name)
-{
-    buffer = NULL;
-    handle = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, size, (LPCWSTR)name);
-    if (handle != NULL)
-    {
-        buffer = MapViewOfFile(handle, FILE_WRITE_ACCESS, 0, 0, size);
-        if (buffer == NULL)
-        {
-            std::cout << "[Error]共享内存块 " << name << ", MapViewOfFile 失败" << std::endl;
-            CloseHandle(handle);
-            return false;
-        }        
-    }
-    else
-    {
-        std::cout << "[Error]创建共享内存块 " << name <<  " 失败" << std::endl;
-        return false;
-    }
-
-    std::cout << "[Info]创建共享内存块 " << name << " 完成，大小：" << size << "Bytes" << std::endl;
-    return true;
-}
-
-//写入共享内存
-//返回写入耗时时间ms
-static double WriteMapFile(LPVOID &buffer, const SourceMapFileInfo *info, const cv::Mat frame)
-{
-    auto t0 = std::chrono::high_resolution_clock::now();
-
-    static int offset = sizeof(SourceMapFileInfo);
-
-    std::copy((uint8_t*)info, (uint8_t*)info + offset, (uint8_t *)buffer);
-    std::copy((uint8_t*)frame.data, (uint8_t*)frame.dataend, (uint8_t*)buffer + offset);
-
-    //std::cout << "FFw:" << info->width << " h:" << info->height << " c:" << info->channels << " t:" << info->type << " size:" << offset << std::endl;
-
-    auto t1 = std::chrono::high_resolution_clock::now();
-    double decode_time = std::chrono::duration_cast<ms>(t1 - t0).count();
-
-    return decode_time;
-}
-
+#define     WINDOW_TITLE            "Video Source"    //窗体标题
 
 int main(int argc, char** argv)
 {
-    //SetConsoleCtrlHandler(HandlerRoutine, TRUE);
+    setlocale(LC_ALL, "Chinese-simplified");
+    if (SetConsoleCtrlHandler((PHANDLER_ROUTINE)CloseHandlerRoutine, TRUE) == FALSE)
+    {
+        std::cout << "Unable to install handler!\n" << std::endl;
+        return EXIT_FAILURE;
+    }
     
-    google::ParseCommandLineFlags(&argc, &argv, false);
-    std::cout << "Video Source:" << FLAGS_i << std::endl;
+    //google::SetVersionString(VERSION);
+    //google::SetUsageMessage(GetUsageMessage());
+    if (!ParseAndCheckCommandLine(argc, argv))
+    {
+        std::cout << "bbb" << std::endl;
+        //log4cplus::Logger::shutdown();
+        gflags::ShutDownCommandLineFlags();
+        std::cout << "ccc" << std::endl;
+
+        return EXIT_SUCCESS;
+        exit(EXIT_SUCCESS);
+    }
     
+    //google::ParseCommandLineFlags(&argc, &argv, true);
+#if 0
+
+    Log4CplusConfigure();
+    LOG4CPLUS_INFO(logger, "Video Source Shared");    
+    LOG4CPLUS_INFO(logger, LOG4CPLUS_STRING_TO_TSTRING("Video Source:" + FLAGS_i));
+    //throw std::logic_error("相机参数配置错误: ");
+
+    //配置 VideoCapture
     cv::VideoCapture capture;
     if (FLAGS_i.find("cam:") == 0)
     {
+        //相机索引
         int index = 0, w = 640, h = 480;
         try
         {
             index = std::stoi(FLAGS_i.substr(4).c_str());
-            int x = FLAGS_size.find(',') < 0 ? FLAGS_size.find('x') : -1;
+            //获取配置宽高信息
+            int x = FLAGS_s.find(',') > 0 ? FLAGS_s.find(',') : FLAGS_s.find('x') > 0 ? FLAGS_s.find('x') : -1;
             if (x > 0)
             {
-                w = std::stoi(FLAGS_size.substr(0, x));
-                h = std::stoi(FLAGS_size.substr(x + 1));
+                w = std::stoi(FLAGS_s.substr(0, x));
+                h = std::stoi(FLAGS_s.substr(x + 1));
             }
         }
         catch(std::exception &e)
         {
-            std::cerr << "[Error]" << e.what() << std::endl;
+            LOG4CPLUS_ERROR(logger, LOG4CPLUS_STRING_TO_TSTRING(e.what()));
             system("pause");
             return EXIT_FAILURE;
         }
-        capture.open(index);
 
+        //打开相机，设置相机宽高属性
+        capture.open(index);        
         capture.set(cv::CAP_PROP_FRAME_WIDTH, w);
         capture.set(cv::CAP_PROP_FRAME_HEIGHT, h);
+
+        std::stringstream info;
+        info << "Setting Camera Index: " << index << "  Size: " << w << "," << h;
+        LOG4CPLUS_INFO(logger, LOG4CPLUS_STRING_TO_TSTRING(info.str()));
     }
     else if (FLAGS_i.find("url:") == 0)
     {
+        //视频 URL 地址
         std::string url = FLAGS_i.substr(4);
-        std::cout << "URL:" << url << std::endl;
-
         capture.open(url);
+
+        LOG4CPLUS_INFO(logger, LOG4CPLUS_STRING_TO_TSTRING(FLAGS_i));
     }
     else
     {
-        std::cerr << "[Error]" << "输入参数错误 - i url : path OR - i cam : 0" << std::endl;
-        system("pause");
+        LOG4CPLUS_ERROR(logger, LOG4CPLUS_STRING_TO_TSTRING("输入参数错误：" + FLAGS_i + "， 示例：-i url:path OR -i cam:0"));
         return EXIT_FAILURE;
     }
     
     if (!capture.isOpened())
     {
-        std::cout << "[Error]无法打开视频源 " << FLAGS_i << std::endl;
-        system("pasue");
+        LOG4CPLUS_ERROR(logger, "无法打开视频源");
         return EXIT_FAILURE;
     }
 
-    if (FLAGS_imshow)
-    {
-        cv::namedWindow(WINDOW_TITLE);
-        //cv::setMouseCallback("source", onMouseEventHandler, 0);
-    }
+    if (!FLAGS_noshow)   cv::namedWindow(WINDOW_TITLE);
 
     int width = capture.get(cv::CAP_PROP_FRAME_WIDTH);
     int height = capture.get(cv::CAP_PROP_FRAME_HEIGHT);
     int count = capture.get(cv::CAP_PROP_FRAME_COUNT);
     int format = capture.get(cv::CAP_PROP_FORMAT);
     int fps = capture.get(cv::CAP_PROP_FPS);
-    std::cout << "Video Size:" << width << "," << height << std::endl;
-    std::cout << "Video Count:" << count << std::endl;
-    std::cout << "Video Format:" << format << std::endl;
-    std::cout << "Video FPS:" << fps << std::endl;
-    cv::Size dsize(width * FLAGS_r, height * FLAGS_r);
+
+    std::stringstream info;
+    info << "Output Info Size:" << width << "," << height;
+    info << "  FPS:" << fps;
+    info << "  Count:" << count;
+    info << "  Format:" << format;
+    LOG4CPLUS_INFO(logger, LOG4CPLUS_STRING_TO_TSTRING(info.str()));
     
-    uint32_t fid = 0;
     bool isLastFrame = false;
-    cv::Mat srcFrame, aiFrame;
+    cv::Mat srcFrame;
 
-    SourceMapFileInfo srcHeadInfo, aiHeadInfo;
-    LPVOID srcBuffer = NULL, aiBuffer = NULL;
-    HANDLE srcMapFile = NULL, aiMapFile = NULL;
+    LPVOID srcBuffer = NULL;
+    HANDLE srcMapFile = NULL;
+    MapFileHeadInfo srcHeadInfo;
 
-    CreateOnlyWriteMapFile(srcMapFile, srcBuffer, SOURCE_BUFFER_SIZE, FLAGS_mn.c_str());
-    CreateOnlyWriteMapFile(aiMapFile, aiBuffer, SOURCE_BUFFER_SIZE * FLAGS_r, FLAGS_rmn.c_str());
+    if (!CreateOnlyWriteMapFile(srcMapFile, srcBuffer, FLAGS_fs, FLAGS_fn.c_str()))
+    {
+        LOG4CPLUS_ERROR(logger, LOG4CPLUS_STRING_TO_TSTRING("创建共享内存失败"));
+        return EXIT_FAILURE;
+    }
     
     while (true)
     {
-        if (!isRunning) break;
+        if (!IsRunning) break;
         auto t0 = std::chrono::high_resolution_clock::now();
 
         if (!capture.read(srcFrame))
@@ -192,8 +147,7 @@ int main(int argc, char** argv)
             }
             else
             {
-                std::cout << "[Error]读取视频帧错误" << FLAGS_i << std::endl;
-                system("pasue");
+                LOG4CPLUS_ERROR(logger, LOG4CPLUS_STRING_TO_TSTRING("读取视频帧错误：" + FLAGS_i));
                 return EXIT_FAILURE;
             }
         }
@@ -202,47 +156,38 @@ int main(int argc, char** argv)
         double decode_time = std::chrono::duration_cast<ms>(t1 - t0).count();
         std::cout << "\33[2K\r" << "Read/Decode Frame:" << decode_time << "ms";
 
+        //写入到共享内存
         auto t2 = std::chrono::high_resolution_clock::now();
-        //Write To Memory
-        if (srcMapFile != NULL && srcBuffer != NULL)
+        if (!WriteMapFile(srcMapFile, srcBuffer, &srcHeadInfo, srcFrame))
         {
-            srcHeadInfo.fid = fid;
-            srcHeadInfo << srcFrame;
-
-            double decode_time = WriteMapFile(srcBuffer, &srcHeadInfo, srcFrame);
-            //std::cout << "\t" << "Write To Memory:" << decode_time << "ms " << srcFrame.rows * srcFrame.cols * srcFrame.channels() << "Bytes";
         }
-        if (aiMapFile != NULL && aiBuffer != NULL)
-        {
-            cv::resize(srcFrame, aiFrame, dsize);
-            aiHeadInfo.fid = fid;
-            aiHeadInfo << aiFrame;
 
-            double decode_time = WriteMapFile(aiBuffer, &aiHeadInfo, aiFrame);
-            //std::cout << "\t" << "Write To Memory:" << decode_time << "ms " << aiFrame.rows * aiFrame.cols * aiFrame.channels() << "Bytes";
-        }
         auto t3 = std::chrono::high_resolution_clock::now();
         double write_time = std::chrono::duration_cast<ms>(t3 - t2).count();
         std::cout << "\tWrite To Memory:" << write_time << "ms";
 
-        const int key = cv::waitKey(DELAY) & 0xFF;
-        if (key == 'c') FLAGS_imshow ^= true;
+        double use_time = std::chrono::duration_cast<ms>(t3 - t0).count();
+        int delay = WaitKeyDelay - use_time;
+        delay = delay < 0 ? 1 : delay;
 
-        if (FLAGS_imshow)
-            cv::imshow(WINDOW_TITLE, srcFrame);
+        cv::waitKey(delay);
+        if (!FLAGS_noshow) cv::imshow(WINDOW_TITLE, srcFrame);
 
-        fid++;
         if (isLastFrame) break;
     }
 
     capture.release();
     cv::destroyAllWindows();
 
-    if (aiMapFile != NULL)  CloseHandle(aiMapFile);
+	//撤消地址空间内的视图
+	if(srcBuffer != NULL) UnmapViewOfFile(srcBuffer);
+    //关闭共享文件句柄
     if (srcMapFile != NULL)  CloseHandle(srcMapFile);
 
-    std::cout << "Completed!" << std::endl;
-    system("pause");
+    LOG4CPLUS_INFO(logger, "Exiting ... ");
+    log4cplus::Logger::shutdown();
+#endif
+    Sleep(500);
 
     return EXIT_SUCCESS;
 }

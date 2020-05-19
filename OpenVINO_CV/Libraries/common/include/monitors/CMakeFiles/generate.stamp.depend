@@ -1,0 +1,9 @@
+# CMake generation dependency list for this directory.
+D:/Program Files (x86)/IntelSWTools/openvino/deployment_tools/inference_engine/demos/common/monitors/CMakeLists.txt
+D:/Program Files (x86)/IntelSWTools/openvino/opencv/cmake/OpenCVConfig-version.cmake
+D:/Program Files (x86)/IntelSWTools/openvino/opencv/cmake/OpenCVConfig.cmake
+D:/Program Files (x86)/IntelSWTools/openvino/opencv/cmake/OpenCVModules-debug.cmake
+D:/Program Files (x86)/IntelSWTools/openvino/opencv/cmake/OpenCVModules-release.cmake
+D:/Program Files (x86)/IntelSWTools/openvino/opencv/cmake/OpenCVModules.cmake
+D:/Program Files/CMake/share/cmake-3.15/Modules/FindPackageHandleStandardArgs.cmake
+D:/Program Files/CMake/share/cmake-3.15/Modules/FindPackageMessage.cmake

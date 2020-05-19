@@ -24,6 +24,7 @@
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>OpenPoseModel</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>2DOpenPoseModel</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -43,14 +44,14 @@
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v142</PlatformToolset>
-    <CharacterSet>Unicode</CharacterSet>
+    <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>Unicode</CharacterSet>
+    <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -72,8 +73,8 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(INTEL_OPENVINO_DIR)\opencv\include;..\OpenVINO_CV_Lib_Static;..\Libraries\gflags-2.2.2\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(INTEL_OPENVINO_DIR)\opencv\lib;..\Libraries\gflags-2.2.2\lib\Debug;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(INTEL_OPENVINO_DIR)\inference_engine\include;$(INTEL_OPENVINO_DIR)\opencv\include;..\OpenVINO_CV_Lib_Static;..\Libraries\log4cplus-2.0.4\include;..\Libraries\common\include;..\Libraries\gflags-2.2.2\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(INTEL_OPENVINO_DIR)\inference_engine\lib\intel64\Debug;$(INTEL_OPENVINO_DIR)\opencv\lib;..\Libraries\common\lib\Debug;..\Libraries\gflags-2.2.2\lib\Debug;..\Libraries\log4cplus-2.0.4\lib\Debug;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
@@ -83,8 +84,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(INTEL_OPENVINO_DIR)\opencv\include;..\OpenVINO_CV_Lib_Static;..\Libraries\gflags-2.2.2\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(INTEL_OPENVINO_DIR)\opencv\lib;..\Libraries\gflags-2.2.2\lib\Release;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(INTEL_OPENVINO_DIR)\inference_engine\include;$(INTEL_OPENVINO_DIR)\opencv\include;..\OpenVINO_CV_Lib_Static;..\Libraries\log4cplus-2.0.4\include;..\Libraries\common\include;..\Libraries\gflags-2.2.2\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(INTEL_OPENVINO_DIR)\inference_engine\lib\intel64\Release;$(INTEL_OPENVINO_DIR)\opencv\lib;..\Libraries\common\lib\Release;..\Libraries\gflags-2.2.2\lib\Release;..\Libraries\log4cplus-2.0.4\lib\Release;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -92,14 +93,20 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;WIN32;_WINDOWS;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>gflags_static_debug.lib;shlwapi.lib;opencv_core430d.lib;opencv_videoio430d.lib;opencv_highgui430d.lib;opencv_imgproc430d.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>gflags_static_debug.lib;log4cplusD.lib;shlwapi.lib;opencv_core430d.lib;opencv_videoio430d.lib;opencv_highgui430d.lib;opencv_imgproc430d.lib;opencv_imgcodecs430d.lib;inference_engine_legacyd.lib;inference_engined.lib;inference_engine_c_apid.lib;inference_engine_nn_builderd.lib;monitors.lib;pdh.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <LargeAddressAware>true</LargeAddressAware>
+      <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
     </Link>
+    <ProjectReference>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -138,22 +145,37 @@
       <PrecompiledHeader>
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;WIN32;_WINDOWS;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <UndefinePreprocessorDefinitions>
+      </UndefinePreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>gflags_static.lib;shlwapi.lib;opencv_core430.lib;opencv_videoio430.lib;opencv_highgui430.lib;opencv_imgproc430.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>gflags_static.lib;log4cplus.lib;shlwapi.lib;opencv_core430.lib;opencv_videoio430.lib;opencv_highgui430.lib;opencv_imgproc430.lib;opencv_imgcodecs430.lib;inference_engine_legacy.lib;inference_engine.lib;inference_engine_c_api.lib;inference_engine_nn_builder.lib;monitors.lib;pdh.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="human_pose.cpp" />
+    <ClCompile Include="human_pose_estimator.cpp" />
     <ClCompile Include="OpenPoseModel.cpp" />
+    <ClCompile Include="peak.cpp" />
+    <ClCompile Include="render_human_pose.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="args.hpp" />
+    <ClInclude Include="human_pose.hpp" />
+    <ClInclude Include="human_pose_estimator.hpp" />
+    <ClInclude Include="peak.hpp" />
+    <ClInclude Include="render_human_pose.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
