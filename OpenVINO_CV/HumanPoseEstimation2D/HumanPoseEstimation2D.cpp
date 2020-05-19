@@ -51,7 +51,7 @@ int main(int argc, char** argv)
 
     OutputData data;    //输出数据
     static int odSize = sizeof(OutputData);   //OutputData 结构数据大小
-
+    
     cv::Mat frame;
     MapFileHeadInfo head;   //文件头信息
     uint32_t lastFrameId = 0;//上一帧id

@@ -15,9 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="OpenPoseModel.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="render_human_pose.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -28,6 +25,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="human_pose.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="HumanPoseEstimation2D.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

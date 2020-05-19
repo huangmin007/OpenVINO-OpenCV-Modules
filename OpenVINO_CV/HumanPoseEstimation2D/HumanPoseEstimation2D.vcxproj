@@ -24,7 +24,7 @@
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>OpenPoseModel</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>2DHumanPoseEstimation</ProjectName>
+    <ProjectName>HumanPoseEstimation2D</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -166,7 +166,7 @@
   <ItemGroup>
     <ClCompile Include="human_pose.cpp" />
     <ClCompile Include="human_pose_estimator.cpp" />
-    <ClCompile Include="OpenPoseModel.cpp" />
+    <ClCompile Include="HumanPoseEstimation2D.cpp" />
     <ClCompile Include="peak.cpp" />
     <ClCompile Include="render_human_pose.cpp" />
   </ItemGroup>
