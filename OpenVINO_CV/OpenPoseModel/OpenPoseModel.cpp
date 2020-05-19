@@ -20,108 +20,149 @@
 using namespace human_pose_estimation;
 
 
-uint8_t buffer[1024 * 1024 * 8];
-
 int main(int argc, char** argv)
 {
-    Log4CplusConfigure();
-    LOG4CPLUS_INFO(logger, "2D Pose");
+    if (SetConsoleCtrlHandler((PHANDLER_ROUTINE)CloseHandlerRoutine, TRUE) == FALSE)
+    {
+        std::cout << "Error: Unable to install handler!\n" << std::endl;
+        return EXIT_FAILURE;
+    }
 
+    //解析参数
     google::ParseCommandLineFlags(&argc, &argv, false);
-    std::cout << "InferenceEngine: " << InferenceEngine::GetInferenceEngineVersion() << std::endl;
-	
-	//打开指定的文件映射对象
-    HANDLE hMapFile = OpenFileMapping(FILE_MAP_READ, FALSE, FLAGS_rmn.c_str());//PAGE_READONLY
-    if (hMapFile == NULL)
-    {
-        std::cout << "共享内存块未创建：" << FLAGS_rmn << std::endl;
-        system("pause");
-        return EXIT_FAILURE;
-    }
-	//映射到当前进程的地址空间
-    LPVOID pBuffer = MapViewOfFile(hMapFile, FILE_MAP_READ, 0, 0, 0);
-    if (pBuffer == NULL)
-    {
-        std::cout << "共享内存块 MapViewOfFile 失败" << std::endl;
-        system("pause");
-        return EXIT_FAILURE;
-    }
     
-    HumanPoseEstimator estimator(FLAGS_m, FLAGS_d, FLAGS_pc);
+    //日志格式
+    Log4CplusConfigure();
+    LOG4CPLUS_INFO(logger, "2D Human Pose Estimation");
+
+    //引擎信息
+    std::stringstream msg; msg << "InferenceEngine: " << InferenceEngine::GetInferenceEngineVersion();
+    LOG4CPLUS_INFO(logger, LOG4CPLUS_STRING_TO_TSTRING(msg.str()));
+
+#if 会导致共享内存句柄获取失败
+    //msg.str(""); msg << "可用目标设备:" << GetAvailableDevices();
+    //LOG4CPLUS_INFO(logger, LOG4CPLUS_STRING_TO_TSTRING(msg.str()));
+#endif
+
+    LPVOID pBuffer = NULL, dBuffer = NULL;
+    HANDLE hMapFile = NULL, dMapFile = NULL;
+    if (!GetOnlyReadMapFile(hMapFile, pBuffer, FLAGS_rfn.c_str())) return EXIT_FAILURE;    
+    if (!CreateOnlyWriteMapFile(dMapFile, dBuffer, FLAGS_wfs, FLAGS_wfn.c_str())) return EXIT_FAILURE;
+
+    OutputData data;    //输出数据
+    static int odSize = sizeof(OutputData);   //OutputData 结构数据大小
 
     cv::Mat frame;
-    uint32_t lastFrameId = 0;
-    MapFileHeadInfo info;
-    static int offset = sizeof(MapFileHeadInfo);
-    int t = 0;
+    MapFileHeadInfo head;   //文件头信息
+    uint32_t lastFrameId = 0;//上一帧id
+    static int hdSize = sizeof(MapFileHeadInfo);    //MapFileHeadInfo 结构数据大小
+
+    std::vector<HumanPose> poses;   //预测的姿态数据
+    HumanPoseEstimator estimator(FLAGS_m, FLAGS_d, FLAGS_pc);
     
-    std::copy((uint8_t*)pBuffer, (uint8_t*)pBuffer + offset, reinterpret_cast<uint8_t*>(&info));
-    if (frame.empty())
-        frame.create(info.height, info.width, info.type);    
-    std::copy((uint8_t*)pBuffer + offset, (uint8_t*)pBuffer + offset + info.length, frame.data);
+    //读取第一帧数据
+    std::copy((uint8_t*)pBuffer, (uint8_t*)pBuffer + hdSize, reinterpret_cast<uint8_t*>(&head));
+    if (frame.empty())  frame.create(head.height, head.width, head.type);
+    std::copy((uint8_t*)pBuffer + hdSize, (uint8_t*)pBuffer + hdSize + head.length, frame.data);
 
-    estimator.reshape(frame);  // 如果发生网络重塑，请勿进行测量
-
-    cv::Size graphSize{ static_cast<int>(info.width / 4), 60 };
-    Presenter presenter(FLAGS_u, info.height - graphSize.height - 10, graphSize);
-    std::vector<HumanPose> poses;
+    estimator.reshape(frame);   // 如果发生网络重塑，请勿进行测量
+    cv::Size graphSize{ static_cast<int>(head.width / 4), 60 };
+    Presenter presenter(FLAGS_um, head.height - graphSize.height - 10, graphSize);
+    
+    int waitDelay = 1;
+    double use_time = 0.0;
+    auto t0 = std::chrono::high_resolution_clock::now();
+    auto t1 = std::chrono::high_resolution_clock::now();
 
     while (true)
     {
-        auto t0 = std::chrono::high_resolution_clock::now();
-        std::copy((uint8_t*)pBuffer, (uint8_t*)pBuffer + offset, reinterpret_cast<uint8_t*>(&info));
-        
-        //自动读取数据，调整大小
-        if (frame.empty() || frame.rows != info.height || frame.cols != info.width || frame.type() != info.type)
-        {
-            frame.release();
-            frame.create(info.height, info.width, info.type);
-        }
+        if (!IsRunning) break;
+
+        t0 = std::chrono::high_resolution_clock::now();
+        std::copy((uint8_t*)pBuffer, (uint8_t*)pBuffer + hdSize, reinterpret_cast<uint8_t*>(&head));
         
         //重复帧，不在读取
-        if (lastFrameId != info.fid)
+        if (lastFrameId != head.fid)
         {
-            //frame.data = (uchar*)pBuffer + offset; //这种是可以的
-            std::copy((uint8_t*)pBuffer + offset, (uint8_t*)pBuffer + offset + info.length, frame.data);
+            std::copy((uint8_t*)pBuffer + hdSize, (uint8_t*)pBuffer + hdSize + head.length, frame.data);
 
             estimator.frameToBlobCurr(frame);
             estimator.startCurr();
 
             if (estimator.readyCurr())
             {
+                std::stringstream rawPose;
                 poses = estimator.postprocessCurr();
-                /*
+                
+                rawPose << "<data>\r\n";
+                rawPose << "\t<fid>" << head.fid << "</fid>\r\n";
+                rawPose << "\t<count>" << poses.size() << "</count>\r\n";
+                rawPose << "\t<keypoints>ears,eyes,nose,neck,shoulders,elbows,wrists,hips,knees,ankles</keypoints>\r\n";
+
                 for (HumanPose const& pose : poses)
                 {
-                    std::stringstream rawPose;
+                    rawPose << "\t<pose source=\"" << pose.score << "\">\r\n";
+                    for (auto const& keypoint : pose.keypoints)
+                        rawPose << "\t\t<position>" << keypoint.x << "," << keypoint.y << "</position>\r\n";
                     
-                    rawPose << std::fixed << std::setprecision(0);
-                    for (auto const& keypoint : pose.keypoints) 
-                    {
-                        rawPose << keypoint.x << "," << keypoint.y << " ";
-                    }
-                    rawPose << pose.score;
-                    
-                    std::cout << rawPose.str() << std::endl;
+                    rawPose << "\t</pose>\r\n";
                 }
-                */
-                presenter.drawGraphs(frame);
-                renderHumanPose(poses, frame);
+                rawPose << "</data>";
+
+                std::string pose = rawPose.str();
+                if (FLAGS_output)
+                    std::cout << "Source::" << pose << std::endl;
+
+                data.mid = 0;
+                data.fid = head.fid;
+                data.length = pose.length();
+                data.format = ResultDataFormat::XML;
+
+                std::copy((uint8_t*)&data, (uint8_t*)&data + odSize, (uint8_t*)dBuffer);
+                std::copy(pose.c_str(), pose.c_str() + pose.length(), (char*)dBuffer + odSize);
+
+                if (FLAGS_show)
+                {
+                    presenter.drawGraphs(frame);
+                    renderHumanPose(poses, frame);
+                }
+#if 0
+                OutputData* t = reinterpret_cast<OutputData*>(dBuffer);
+                std::cout << "Size:" << sizeof(OutputData) << " fid:" << t->fid << " len:" << t->length << std::endl;
+                
+                char *ss = new char[t->length + 1];
+                std::copy((char*)dBuffer + odSize, (char*)dBuffer + odSize + t->length, ss);
+                ss[t->length + 1] = '\0';
+                std::cout << "Memory::" << ss << std::endl;
+#endif
             }
         }
     
-        auto t1 = std::chrono::high_resolution_clock::now();
-        double read_time = std::chrono::duration_cast<ms>(t1 - t0).count();
-        std::cout << "\33[2K\r" << "Memory Frame:" << read_time << "ms";
+        t1 = std::chrono::high_resolution_clock::now();
+        use_time = std::chrono::duration_cast<ms>(t1 - t0).count();
+        if(!FLAGS_output) std::cout << "\33[2K\r" << "Total Inference Time:" << use_time << "ms";
 
-        cv::waitKey(1);
-        cv::imshow("2D Pose ", frame);
-
-        lastFrameId = info.fid;
+        waitDelay = WaitKeyDelay - use_time;
+        cv::waitKey(waitDelay <= 0 ? 1 : waitDelay);
+        if (FLAGS_show) cv::imshow("2D Human Pose Estimation (" + FLAGS_d + ")", frame);
+        
+        lastFrameId = head.fid;
     }
+    
+    cv::destroyAllWindows();
 
-    system("pause");
-    std::cout << "Hello World!\n";
+    //撤消地址空间内的视图
+    if (pBuffer != NULL) UnmapViewOfFile(pBuffer);
+    if (dBuffer != NULL) UnmapViewOfFile(dBuffer);
+    //关闭共享文件句柄
+    if (hMapFile != NULL) CloseHandle(hMapFile);
+    if (hMapFile != NULL) CloseHandle(dMapFile);
+
+    LOG4CPLUS_INFO(logger, "Exiting ... ");
+    log4cplus::Logger::shutdown();
+
+    Sleep(500); 
+    return EXIT_SUCCESS;
 }
 
 // 运行程序: Ctrl + F5 或调试 >“开始执行(不调试)”菜单

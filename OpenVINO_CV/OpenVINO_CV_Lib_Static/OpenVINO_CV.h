@@ -37,8 +37,6 @@ struct MapFileHeadInfo
     uint32_t    reserve3 = 0;
     uint32_t    reserve4 = 0;
 
-    //uint8_t     data[];             //数据
-
     void copy(const cv::Mat& src)
     {
         this->width = src.cols;
@@ -64,8 +62,8 @@ struct MapFileHeadInfo
 //输出结果数据格式
 enum ResultDataFormat:uint8_t
 {
-    RAW,        //原始字节数据
-    STRING,     //字符类型，未定义字符格式
+    RAW,        //原始字节数据，可将原始字节转为指定的结构数据
+    STRING,     //字符类型，未定义字符格式，但有一定规则
     JSON,       //字符类型，定义为 JSON 格式
     XML,        //字符类型，定义为 XML 格式
 };
@@ -76,7 +74,7 @@ struct OutputData
     uint32_t    fid = 0;        //帧 id
     uint8_t     mid;            //这里应该是指模块ID，由哪个模块输出的数据
     uint32_t    length;         //数据的有效长度
-    uint8_t     format;         //数据格式
+    uint8_t     format;         //数据格式，see ResultDataFormat
 
     /// 以下为保留字段 4 x 4 = 16
     uint32_t    reserve1 = 0;
@@ -84,7 +82,12 @@ struct OutputData
     uint32_t    reserve3 = 0;
     uint32_t    reserve4 = 0;
 
-    uint8_t     data[];         //原始数据，不同的结果类型，数据的解释不一样，应该数据的有效长度动态
+    uint8_t     data[];         //数据，不同的结果类型，数据的解释不一样，应该数据的有效长度动态
+};
+
+struct PoseData2D
+{
+    uint32_t had;
 };
 
 //SetConsoleCtrlHandler
@@ -117,7 +120,7 @@ static DWORD GetLastErrorFormatMessage(LPVOID& message)
     return id;
 };
 
-//创建只写的内存共享文件
+//创建只写的内存共享文件句柄及内存空间映射视图
 //创建成功 返回 true
 static bool CreateOnlyWriteMapFile(HANDLE& handle, LPVOID& buffer, uint size, const char* name)
 {
@@ -129,7 +132,7 @@ static bool CreateOnlyWriteMapFile(HANDLE& handle, LPVOID& buffer, uint size, co
     std::stringstream info; info << "CreateFileMapping [" << name << "]  GetLastError:" << ErrorID << "  Message: " << (char*)message;
     LOG4CPLUS_INFO(logger, LOG4CPLUS_STRING_TO_TSTRING(info.str()));
 
-    if (handle == NULL) return false;
+    if (ErrorID != 0 || handle == NULL) return false;
 
     ///映射到当前进程的地址空间视图
     buffer = MapViewOfFile(handle, FILE_WRITE_ACCESS, 0, 0, size); //FILE_WRITE_ACCESS,FILE_MAP_ALL_ACCESS,,FILE_MAP_WRITE
@@ -138,7 +141,37 @@ static bool CreateOnlyWriteMapFile(HANDLE& handle, LPVOID& buffer, uint size, co
     info.str("");  info << "MapViewOfFile [" << name << "]  GetLastError:" << ErrorID << "  Message:" << (char*)message;
     LOG4CPLUS_INFO(logger, LOG4CPLUS_STRING_TO_TSTRING(info.str()));
 
-    if (buffer == NULL)
+    if (ErrorID != 0 || buffer == NULL)
+    {
+        CloseHandle(handle);
+        return false;
+    }
+
+    return true;
+}
+
+//获取只读的内存共享文件句柄及内存空间映射视图
+//获取成功 返回 true
+static bool GetOnlyReadMapFile(HANDLE& handle, LPVOID& buffer, const char* name)
+{
+    ///创建共享内存
+    handle = OpenFileMapping(FILE_MAP_READ, FALSE, (LPCSTR)name);   //PAGE_READONLY
+    //GetLastError 检查 OpenFileMapping 状态
+    LPVOID message = NULL;
+    DWORD ErrorID = GetLastErrorFormatMessage(message);
+    std::stringstream info; info << "OpenFileMapping [" << name << "]  GetLastError:" << ErrorID << "  Message: " << (char*)message;
+    LOG4CPLUS_INFO(logger, LOG4CPLUS_STRING_TO_TSTRING(info.str()));
+
+    if (ErrorID != 0 || handle == NULL) return false;
+
+    ///映射到当前进程的地址空间视图
+    buffer = MapViewOfFile(handle, FILE_MAP_READ, 0, 0, 0);
+    //GetLastError 检查 MapViewOfFile 状态
+    ErrorID = GetLastErrorFormatMessage(message);
+    info.str("");  info << "MapViewOfFile [" << name << "]  GetLastError:" << ErrorID << "  Message:" << (char*)message;
+    LOG4CPLUS_INFO(logger, LOG4CPLUS_STRING_TO_TSTRING(info.str()));
+
+    if (ErrorID != 0 || buffer == NULL)
     {
         CloseHandle(handle);
         return false;

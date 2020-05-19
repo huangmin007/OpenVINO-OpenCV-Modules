@@ -1,25 +1,19 @@
 ﻿// VSourceShared.cpp : 此文件包含 "main" 函数。程序执行将在此处开始并结束。
 //
 
-
-//  input args -i url:aa  -i cam:0
-//  run args
-//  output args
-
-
 #include <string>
 #include <sstream>
 #include <stdio.h>
 #include <iostream>
 #include <algorithm>
 #include <errno.h>
-//#include <opencv2/opencv.hpp>
+#include <opencv2/opencv.hpp>
 #include <Windows.h>
 
 #include "args.hpp"
 #include "OpenVINO_CV.h"
 #include "LoggerConfig.h"
-
+#include <gflags/gflags.h>
 
 #define     WINDOW_TITLE            "Video Source"    //窗体标题
 
@@ -31,25 +25,32 @@ int main(int argc, char** argv)
         std::cout << "Unable to install handler!\n" << std::endl;
         return EXIT_FAILURE;
     }
-    
-    //google::SetVersionString(VERSION);
-    //google::SetUsageMessage(GetUsageMessage());
+
+    gflags::SetVersionString(VERSION);
+    gflags::SetUsageMessage(GetUsageMessage());
+    gflags::ParseCommandLineFlags(&argc, &argv, true);
+
+#if test
+    if (FLAGS_h)
+    {
+        std::cout << GetUsageMessage() << std::endl;
+        return 0;
+    }
     if (!ParseAndCheckCommandLine(argc, argv))
     {
         std::cout << "bbb" << std::endl;
         //log4cplus::Logger::shutdown();
-        gflags::ShutDownCommandLineFlags();
+        //gflags::ShutDownCommandLineFlags();
+
         std::cout << "ccc" << std::endl;
 
         return EXIT_SUCCESS;
         exit(EXIT_SUCCESS);
     }
-    
-    //google::ParseCommandLineFlags(&argc, &argv, true);
-#if 0
+#endif
 
     Log4CplusConfigure();
-    LOG4CPLUS_INFO(logger, "Video Source Shared");    
+    LOG4CPLUS_INFO(logger, "Video Source Shared");
     LOG4CPLUS_INFO(logger, LOG4CPLUS_STRING_TO_TSTRING("Video Source:" + FLAGS_i));
     //throw std::logic_error("相机参数配置错误: ");
 
@@ -70,15 +71,14 @@ int main(int argc, char** argv)
                 h = std::stoi(FLAGS_s.substr(x + 1));
             }
         }
-        catch(std::exception &e)
+        catch (std::exception & e)
         {
             LOG4CPLUS_ERROR(logger, LOG4CPLUS_STRING_TO_TSTRING(e.what()));
-            system("pause");
             return EXIT_FAILURE;
         }
 
         //打开相机，设置相机宽高属性
-        capture.open(index);        
+        capture.open(index);
         capture.set(cv::CAP_PROP_FRAME_WIDTH, w);
         capture.set(cv::CAP_PROP_FRAME_HEIGHT, h);
 
@@ -99,14 +99,14 @@ int main(int argc, char** argv)
         LOG4CPLUS_ERROR(logger, LOG4CPLUS_STRING_TO_TSTRING("输入参数错误：" + FLAGS_i + "， 示例：-i url:path OR -i cam:0"));
         return EXIT_FAILURE;
     }
-    
+
     if (!capture.isOpened())
     {
         LOG4CPLUS_ERROR(logger, "无法打开视频源");
         return EXIT_FAILURE;
     }
 
-    if (!FLAGS_noshow)   cv::namedWindow(WINDOW_TITLE);
+    if (FLAGS_show)   cv::namedWindow(WINDOW_TITLE);
 
     int width = capture.get(cv::CAP_PROP_FRAME_WIDTH);
     int height = capture.get(cv::CAP_PROP_FRAME_HEIGHT);
@@ -120,7 +120,7 @@ int main(int argc, char** argv)
     info << "  Count:" << count;
     info << "  Format:" << format;
     LOG4CPLUS_INFO(logger, LOG4CPLUS_STRING_TO_TSTRING(info.str()));
-    
+
     bool isLastFrame = false;
     cv::Mat srcFrame;
 
@@ -128,67 +128,53 @@ int main(int argc, char** argv)
     HANDLE srcMapFile = NULL;
     MapFileHeadInfo srcHeadInfo;
 
-    if (!CreateOnlyWriteMapFile(srcMapFile, srcBuffer, FLAGS_fs, FLAGS_fn.c_str()))
+    if (!CreateOnlyWriteMapFile(srcMapFile, srcBuffer, FLAGS_fs + sizeof(MapFileHeadInfo), FLAGS_fn.c_str()))
     {
         LOG4CPLUS_ERROR(logger, LOG4CPLUS_STRING_TO_TSTRING("创建共享内存失败"));
         return EXIT_FAILURE;
     }
-    
+
+    double use_time = 0.0;
+    int waitDelay = WaitKeyDelay;
+    auto t0 = std::chrono::high_resolution_clock::now();
+    auto t1 = std::chrono::high_resolution_clock::now();
+
     while (true)
     {
         if (!IsRunning) break;
-        auto t0 = std::chrono::high_resolution_clock::now();
 
+        t0 = std::chrono::high_resolution_clock::now();
         if (!capture.read(srcFrame))
-        {
-            if (srcFrame.empty())
-            {
-                isLastFrame = true;     //视频播放结束
-            }
-            else
-            {
-                LOG4CPLUS_ERROR(logger, LOG4CPLUS_STRING_TO_TSTRING("读取视频帧错误：" + FLAGS_i));
-                return EXIT_FAILURE;
-            }
-        }
-
-        auto t1 = std::chrono::high_resolution_clock::now();
-        double decode_time = std::chrono::duration_cast<ms>(t1 - t0).count();
-        std::cout << "\33[2K\r" << "Read/Decode Frame:" << decode_time << "ms";
+            if (srcFrame.empty()) break;
 
         //写入到共享内存
-        auto t2 = std::chrono::high_resolution_clock::now();
         if (!WriteMapFile(srcMapFile, srcBuffer, &srcHeadInfo, srcFrame))
-        {
-        }
+            LOG4CPLUS_ERROR(logger, LOG4CPLUS_STRING_TO_TSTRING("写入到共享内存失败"));
 
-        auto t3 = std::chrono::high_resolution_clock::now();
-        double write_time = std::chrono::duration_cast<ms>(t3 - t2).count();
-        std::cout << "\tWrite To Memory:" << write_time << "ms";
+        t1 = std::chrono::high_resolution_clock::now();
+        use_time = std::chrono::duration_cast<ms>(t1 - t0).count();
 
-        double use_time = std::chrono::duration_cast<ms>(t3 - t0).count();
-        int delay = WaitKeyDelay - use_time;
-        delay = delay < 0 ? 1 : delay;
+        waitDelay = WaitKeyDelay - use_time;
+        waitDelay = waitDelay <= 0 ? 1 : waitDelay;
 
-        cv::waitKey(delay);
-        if (!FLAGS_noshow) cv::imshow(WINDOW_TITLE, srcFrame);
+        std::cout << "\33[2K\r" << "Current Frame Read/Write Use :" << use_time << "ms";
 
-        if (isLastFrame) break;
+        cv::waitKey(waitDelay);
+        if (FLAGS_show) cv::imshow(WINDOW_TITLE, srcFrame);
     }
 
     capture.release();
     cv::destroyAllWindows();
 
-	//撤消地址空间内的视图
-	if(srcBuffer != NULL) UnmapViewOfFile(srcBuffer);
+    //撤消地址空间内的视图
+    if (srcBuffer != NULL) UnmapViewOfFile(srcBuffer);
     //关闭共享文件句柄
     if (srcMapFile != NULL)  CloseHandle(srcMapFile);
 
     LOG4CPLUS_INFO(logger, "Exiting ... ");
     log4cplus::Logger::shutdown();
-#endif
-    Sleep(500);
 
+    Sleep(500);
     return EXIT_SUCCESS;
 }
 

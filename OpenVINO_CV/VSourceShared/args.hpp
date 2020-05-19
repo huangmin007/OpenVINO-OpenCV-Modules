@@ -23,28 +23,28 @@ DEFINE_string(fn, "source.bin", fn_message);
 static const char fs_message[] = "分配给共享内存的空间大小，默认为：1920 x 1080 x 4 = 829400 Bytes";
 DEFINE_uint32(fs, 1920 * 1080 * 4, fs_message);
 
-static const char noshow_message[] = "是否显示视频窗口，用于调试";
-DEFINE_bool(noshow, false, noshow_message);
+static const char show_message[] = "是否显示视频窗口，用于调试";
+DEFINE_bool(show, false, show_message);
 
 
 std::string GetUsageMessage()
 {
-    std::stringstream info("2d_human_pose_estimation");
+    std::stringstream info("Video Source Shared");
 
     info << "[OPTION]" << std::endl;
-    info << "    -h    " << h_message << std::endl;
-    info << "    -i    " << i_message << std::endl;
-    info << "    -s    " << s_message << std::endl;
+    info << "    -h     " << h_message << std::endl;
+    info << "    -i     " << i_message << std::endl;
+    info << "    -s     " << s_message << std::endl;
     info << "    -fn    " << fn_message << std::endl;
-    info << "    -fs   " << fs_message << std::endl;
-    info << "    -noshow " << noshow_message << std::endl;
-
+    info << "    -fs    " << fs_message << std::endl;
+    info << "    -show  " << show_message << std::endl;
+    
     return info.str();
 };
 
 bool ParseAndCheckCommandLine(int argc, char* argv[]) 
 {
-    gflags::ParseCommandLineFlags(&argc, &argv, true);
+    gflags::ParseCommandLineNonHelpFlags(&argc, &argv, false);
     if (FLAGS_h) 
     {
         std::cout << GetUsageMessage() << std::endl;
