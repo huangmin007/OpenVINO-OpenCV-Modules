@@ -72,8 +72,8 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>..\Libraries\log4cplus-2.0.4\include;$(INTEL_OPENVINO_DIR)\opencv\include;$(IncludePath)</IncludePath>
-    <LibraryPath>..\Libraries\log4cplus-2.0.4\lib\Debug;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(INTEL_OPENVINO_DIR)\opencv\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(LibraryPath)</LibraryPath>
     <SourcePath>$(SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -84,8 +84,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>..\Libraries\log4cplus-2.0.4\include;$(INTEL_OPENVINO_DIR)\opencv\include;$(IncludePath)</IncludePath>
-    <LibraryPath>..\Libraries\log4cplus-2.0.4\lib\Release;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(INTEL_OPENVINO_DIR)\opencv\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -152,8 +152,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="cmdline.h" />
     <ClInclude Include="framework.h" />
-    <ClInclude Include="LoggerConfig.h" />
     <ClInclude Include="OpenVINO_CV.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>

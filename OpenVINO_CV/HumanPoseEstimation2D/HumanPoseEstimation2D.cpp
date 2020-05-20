@@ -1,90 +1,133 @@
-﻿// OpenPoseModel.cpp : 此文件包含 "main" 函数。程序执行将在此处开始并结束。
+﻿// HumanPoseEstimation2D.cpp : 此文件包含 "main" 函数。程序执行将在此处开始并结束。
 //
 
 #include <iostream>
 #include <vector>
 #include <chrono>
-#include <gflags/gflags.h>
 #include <opencv2/opencv.hpp>
 #include <inference_engine.hpp>
 
 #include <Windows.h>
 #include "OpenVINO_CV.h"
-#include "LoggerConfig.h"
 #include "human_pose_estimator.hpp"
 
 #include <monitors/presenter.h>
 #include "render_human_pose.hpp"
-#include "args.hpp"
+#include "cmdline.h"
 
 using namespace human_pose_estimation;
 
+//获取引擎的可计算设备列表
+static std::string GetAvailableDevices()
+{
+    InferenceEngine::Core ie;
+    std::vector<std::string> devices = ie.GetAvailableDevices();
+
+    std::stringstream info;
+    info << "可用目标设备:";
+    for (const auto& device : devices)
+        info << "  " << device;
+
+    return info.str();
+}
 
 int main(int argc, char** argv)
 {
+    //解析参数
+    cmdline::parser args;
+
+    args.add<std::string>("help", 'h', "参数说明", false, "");
+    args.add<std::string>("model", 'm', "人体姿势估计模型（.xml）文件", false, "models/human-pose-estimation-0001/FP16/human-pose-estimation-0001.xml");
+    args.add<std::string>("device", 'd', "指定用于 人体姿势评估 的目标设备", false, "CPU", cmdline::oneof<std::string>("CPU", "GNA" "GPU"));
+    
+    args.add<std::string>("rfn", 0, "用于读取AI分析的数据内存共享名称", false, "source.bin");
+    args.add<std::string>("wfn", 0, "用于存储AI分析结果数据的内存共享名称", false, "source.raw");
+    args.add<uint32_t>("wfs", 0, "用于存储AI分析结果数据的内存大小，默认：1024*1024(Bytes)", false, 1024 * 1024);
+
+    args.add<bool>("show", 0, "是否显示视频窗口，用于调试", false, false);
+    args.add<bool>("output", 0, "在控制台上输出推断结果信息", false, false);
+
+    args.add<bool>("pc", 0, "启用每层性能报告", false, false);
+    args.add<std::string>("um", 0, "最初显示的监视器列表", false, "");
+
+    bool isParser = args.parse(argc, argv);
+    if (args.exist("help"))
+    {
+        std::cerr << args.usage();
+        return EXIT_SUCCESS;
+    }
+    if (!isParser)
+    {
+        std::cerr << "[ERROR] " << args.error() << std::endl << args.usage();
+        return EXIT_SUCCESS;
+    }
+
     if (SetConsoleCtrlHandler((PHANDLER_ROUTINE)CloseHandlerRoutine, TRUE) == FALSE)
     {
-        std::cout << "Error: Unable to install handler!\n" << std::endl;
+        std::cerr << "[ERROR] Unable to Install Close Handler Routine!" << std::endl;
         return EXIT_FAILURE;
     }
 
-    //解析参数
-    google::ParseCommandLineFlags(&argc, &argv, false);
-    
-    //日志格式
-    Log4CplusConfigure();
-    LOG4CPLUS_INFO(logger, "2D Human Pose Estimation");
+    bool show = args.get<bool>("show");
+    bool output = args.get<bool>("output");
+    std::string model = args.get<std::string>("model");
+    std::string device = args.get<std::string>("device");
 
     //引擎信息
     std::stringstream msg; msg << "InferenceEngine: " << InferenceEngine::GetInferenceEngineVersion();
-    LOG4CPLUS_INFO(logger, LOG4CPLUS_STRING_TO_TSTRING(msg.str()));
-
-#if 会导致共享内存句柄获取失败
-    //msg.str(""); msg << "可用目标设备:" << GetAvailableDevices();
-    //LOG4CPLUS_INFO(logger, LOG4CPLUS_STRING_TO_TSTRING(msg.str()));
+    std::cout << "[ INFO] InferenceEngine: " << InferenceEngine::GetInferenceEngineVersion() << std::endl;
+#if 会导致共享内存句柄获取失败？？
+    std::cout << "[ INFO] 可用目标设备:" << GetAvailableDevices() << std::endl;
 #endif
+    std::cout << "[ INFO] AI模型文件：" << model << std::endl;
 
-    LPVOID pBuffer = NULL, dBuffer = NULL;
-    HANDLE hMapFile = NULL, dMapFile = NULL;
-    if (!GetOnlyReadMapFile(hMapFile, pBuffer, FLAGS_rfn.c_str())) return EXIT_FAILURE;    
-    if (!CreateOnlyWriteMapFile(dMapFile, dBuffer, FLAGS_wfs, FLAGS_wfn.c_str())) return EXIT_FAILURE;
+
+
+    std::cout << "[ INFO] 获取/创建内存共享数据文件 ......" << std::endl;
+    LPVOID sBuffer = NULL, dBuffer = NULL;
+    HANDLE sMapFile = NULL, dMapFile = NULL;
+    if (!GetOnlyReadMapFile(sMapFile, sBuffer, args.get<std::string>("rfn").c_str())) return EXIT_FAILURE;    
+    if (!CreateOnlyWriteMapFile(dMapFile, dBuffer, args.get<uint32_t>("wfs"), args.get<std::string>("wfn").c_str())) return EXIT_FAILURE;
 
     OutputData data;    //输出数据
     static int odSize = sizeof(OutputData);   //OutputData 结构数据大小
     
     cv::Mat frame;
-    MapFileHeadInfo head;   //文件头信息
+    MapFileData head;       //文件头信息
     uint32_t lastFrameId = 0;//上一帧id
-    static int hdSize = sizeof(MapFileHeadInfo);    //MapFileHeadInfo 结构数据大小
+    static int hdSize = sizeof(MapFileData);    //MapFileHeadInfo 结构数据大小
 
+    std::cout << "[ INFO] 模型加载分析中 ......" << std::endl;
     std::vector<HumanPose> poses;   //预测的姿态数据
-    HumanPoseEstimator estimator(FLAGS_m, FLAGS_d, FLAGS_pc);
+    HumanPoseEstimator estimator(model, device, args.get<bool>("pc"));
     
     //读取第一帧数据
-    std::copy((uint8_t*)pBuffer, (uint8_t*)pBuffer + hdSize, reinterpret_cast<uint8_t*>(&head));
+    std::copy((uint8_t*)sBuffer, (uint8_t*)sBuffer + hdSize, reinterpret_cast<uint8_t*>(&head));
     if (frame.empty())  frame.create(head.height, head.width, head.type);
-    std::copy((uint8_t*)pBuffer + hdSize, (uint8_t*)pBuffer + hdSize + head.length, frame.data);
+    std::copy((uint8_t*)sBuffer + hdSize, (uint8_t*)sBuffer + hdSize + head.length, frame.data);
 
     estimator.reshape(frame);   // 如果发生网络重塑，请勿进行测量
     cv::Size graphSize{ static_cast<int>(head.width / 4), 60 };
-    Presenter presenter(FLAGS_um, head.height - graphSize.height - 10, graphSize);
+    Presenter presenter(args.get<std::string>("um"), head.height - graphSize.height - 10, graphSize);
     
     int waitDelay = 1;
     double use_time = 0.0;
     auto t0 = std::chrono::high_resolution_clock::now();
     auto t1 = std::chrono::high_resolution_clock::now();
 
+    
+
     while (true)
     {
         if (!IsRunning) break;
 
         t0 = std::chrono::high_resolution_clock::now();
-        std::copy((uint8_t*)pBuffer, (uint8_t*)pBuffer + hdSize, reinterpret_cast<uint8_t*>(&head));
+        std::copy((uint8_t*)sBuffer, (uint8_t*)sBuffer + hdSize, reinterpret_cast<uint8_t*>(&head));
         
         //重复帧，不在读取
         if (lastFrameId != head.fid)
         {
-            std::copy((uint8_t*)pBuffer + hdSize, (uint8_t*)pBuffer + hdSize + head.length, frame.data);
+            std::copy((uint8_t*)sBuffer + hdSize, (uint8_t*)sBuffer + hdSize + head.length, frame.data);
 
             estimator.frameToBlobCurr(frame);
             estimator.startCurr();
@@ -110,7 +153,7 @@ int main(int argc, char** argv)
                 rawPose << "</data>";
 
                 std::string pose = rawPose.str();
-                if (FLAGS_output)
+                if (output)
                     std::cout << "Source::" << pose << std::endl;
 
                 data.mid = 0;
@@ -121,12 +164,12 @@ int main(int argc, char** argv)
                 std::copy((uint8_t*)&data, (uint8_t*)&data + odSize, (uint8_t*)dBuffer);
                 std::copy(pose.c_str(), pose.c_str() + pose.length(), (char*)dBuffer + odSize);
 
-                if (FLAGS_show)
+                if (show)
                 {
                     presenter.drawGraphs(frame);
                     renderHumanPose(poses, frame);
                 }
-#if 0
+#if TestOutput
                 OutputData* t = reinterpret_cast<OutputData*>(dBuffer);
                 std::cout << "Size:" << sizeof(OutputData) << " fid:" << t->fid << " len:" << t->length << std::endl;
                 
@@ -140,28 +183,28 @@ int main(int argc, char** argv)
     
         t1 = std::chrono::high_resolution_clock::now();
         use_time = std::chrono::duration_cast<ms>(t1 - t0).count();
-        if(!FLAGS_output) std::cout << "\33[2K\r" << "Total Inference Time:" << use_time << "ms";
+        if(!output) std::cout << "\33[2K\r" << "Total Inference Time:" << use_time << "ms";
 
         waitDelay = WaitKeyDelay - use_time;
         cv::waitKey(waitDelay <= 0 ? 1 : waitDelay);
-        if (FLAGS_show) cv::imshow("2D Human Pose Estimation (" + FLAGS_d + ")", frame);
+        if (show) cv::imshow("2D Human Pose Estimation (" + device + ")", frame);
         
         lastFrameId = head.fid;
     }
-    
+
+    std::cout << std::endl;
     cv::destroyAllWindows();
 
     //撤消地址空间内的视图
-    if (pBuffer != NULL) UnmapViewOfFile(pBuffer);
+    if (sBuffer != NULL) UnmapViewOfFile(sBuffer);
     if (dBuffer != NULL) UnmapViewOfFile(dBuffer);
     //关闭共享文件句柄
-    if (hMapFile != NULL) CloseHandle(hMapFile);
-    if (hMapFile != NULL) CloseHandle(dMapFile);
+    if (sMapFile != NULL) CloseHandle(sMapFile);
+    if (dMapFile != NULL) CloseHandle(dMapFile);
 
-    LOG4CPLUS_INFO(logger, "Exiting ... ");
-    log4cplus::Logger::shutdown();
-
+    std::cout << "[ INFO] Exiting ..." << std::endl;
     Sleep(500); 
+
     return EXIT_SUCCESS;
 }
 

@@ -2,41 +2,43 @@
 
 #include <iostream>
 #include <chrono>
-#include <opencv2/opencv.hpp>
 #include <Windows.h>
-
-#include "LoggerConfig.h"
 #include <winioctl.h>
+#include <opencv2/opencv.hpp>
+
+//以 1 字节对齐
+#pragma pack (1)
 
 //控制台线程运行状态，会监听 SetConsoleCtrlHandler 改变
 static bool IsRunning = true;
-//OpenCV cv::waitKey 默认参考延时
-static const int WaitKeyDelay = 33;
+static const int WaitKeyDelay = 33;     //OpenCV cv::waitKey 默认参考延时
 
 typedef std::chrono::duration<double, std::ratio<1, 1000>> ms;
 
-//内存共享文件头部信息
-struct MapFileHeadInfo
+// 内存共享文件数据格式
+// pack(1) 设计为 32 字节大小，数据信息建议不要超出 32 字节
+struct MapFileData
 {
     uint32_t    fid = 0;       //4字节，数据块每更新一次，该值会递增一次，可用于计算不做重复分析帧
 
-    /// Camera 参数 11
-    uint16_t    width;         //视频源宽
-    uint16_t    height;        //视频源高
-    uint8_t     channels;       //视频源通道数，RGB是3通道，ARGB是4通道，灰度图分2通道和单通道(1通道)
-    uint32_t    length;        //文件数据大小
+    /// Camera 参数
+    uint16_t    width;          //视频或相机源宽
+    uint16_t    height;         //视频或相机源高
+    uint8_t     channels;       //视频或相机源通道数，RGB是3通道，ARGB是4通道，灰度图分2通道和单通道(1通道)
+    uint32_t    length;         //文件数据大小
     uint8_t     type;           //Mat type
-    uint8_t     format;         //视频源格式，0 表示未原始数据格式，>0 表示压缩后的图像数据，各种图像的压缩暂未定义
+    uint8_t     format;         //视频或相机源格式，0 表示未原始数据格式，>0 表示压缩后的图像数据，各种图像的压缩暂未定义
 
-    ///  Video 参数
-    //double duration;
+    /// Video 参数
+    uint8_t     reserve0 = 0;   //保留
+    uint32_t    reserve1 = 0;   //保留
+    uint32_t    reserve2 = 0;   //保留
+    uint32_t    reserve3 = 0;   //保留
+    uint32_t    reserve4 = 0;   //保留
 
-    /// 以下为保留字段 4 x 4 = 16
-    uint32_t    reserve1 = 0;
-    uint32_t    reserve2 = 0;
-    uint32_t    reserve3 = 0;
-    uint32_t    reserve4 = 0;
+    uint8_t     data[];         //数据
 
+    //copy Mat info to MapFileHeadInfo
     void copy(const cv::Mat& src)
     {
         this->width = src.cols;
@@ -47,7 +49,8 @@ struct MapFileHeadInfo
         this->length = this->width * this->height * this->channels * src.elemSize1();
     };
 
-    MapFileHeadInfo& operator << (const cv::Mat& src)
+    //copy Mat info to MapFileHeadInfo
+    MapFileData& operator << (const cv::Mat& src)
     {
         this->width = src.cols;
         this->height = src.rows;
@@ -59,7 +62,7 @@ struct MapFileHeadInfo
     };
 };
 
-//输出结果数据格式
+// 输出结果数据格式
 enum ResultDataFormat:uint8_t
 {
     RAW,        //原始字节数据，可将原始字节转为指定的结构数据
@@ -69,6 +72,7 @@ enum ResultDataFormat:uint8_t
 };
 
 // 输出数据结构
+// pack(1) 设计为 32 字节大小，数据信息建议不要超出 32 字节
 struct OutputData
 {
     uint32_t    fid = 0;        //帧 id
@@ -76,11 +80,12 @@ struct OutputData
     uint32_t    length;         //数据的有效长度
     uint8_t     format;         //数据格式，see ResultDataFormat
 
-    /// 以下为保留字段 4 x 4 = 16
+    uint16_t    reserve0 = 0;
     uint32_t    reserve1 = 0;
     uint32_t    reserve2 = 0;
     uint32_t    reserve3 = 0;
     uint32_t    reserve4 = 0;
+    uint32_t    reserve5 = 0;
 
     uint8_t     data[];         //数据，不同的结果类型，数据的解释不一样，应该数据的有效长度动态
 };
@@ -126,20 +131,16 @@ static bool CreateOnlyWriteMapFile(HANDLE& handle, LPVOID& buffer, uint size, co
 {
     ///创建共享内存
     handle = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, size, (LPCSTR)name);
-    //GetLastError 检查 CreateFileMapping 状态
     LPVOID message = NULL;
-    DWORD ErrorID = GetLastErrorFormatMessage(message);
-    std::stringstream info; info << "CreateFileMapping [" << name << "]  GetLastError:" << ErrorID << "  Message: " << (char*)message;
-    LOG4CPLUS_INFO(logger, LOG4CPLUS_STRING_TO_TSTRING(info.str()));
+    DWORD ErrorID = GetLastErrorFormatMessage(message);     //GetLastError 检查 CreateFileMapping 状态
+    std::cout << "[ INFO] CreateFileMapping [" << name << "]  GetLastError:" << ErrorID << "  Message: " << (char*)message;
 
     if (ErrorID != 0 || handle == NULL) return false;
 
     ///映射到当前进程的地址空间视图
-    buffer = MapViewOfFile(handle, FILE_WRITE_ACCESS, 0, 0, size); //FILE_WRITE_ACCESS,FILE_MAP_ALL_ACCESS,,FILE_MAP_WRITE
-    //GetLastError 检查 MapViewOfFile 状态
-    ErrorID = GetLastErrorFormatMessage(message);
-    info.str("");  info << "MapViewOfFile [" << name << "]  GetLastError:" << ErrorID << "  Message:" << (char*)message;
-    LOG4CPLUS_INFO(logger, LOG4CPLUS_STRING_TO_TSTRING(info.str()));
+    buffer = MapViewOfFile(handle, FILE_WRITE_ACCESS, 0, 0, size);  //FILE_WRITE_ACCESS,FILE_MAP_ALL_ACCESS,,FILE_MAP_WRITE
+    ErrorID = GetLastErrorFormatMessage(message);                   //GetLastError 检查 MapViewOfFile 状态
+    std::cout << "[ INFO] MapViewOfFile     [" << name << "]  GetLastError:" << ErrorID << "  Message:" << (char*)message;
 
     if (ErrorID != 0 || buffer == NULL)
     {
@@ -159,8 +160,7 @@ static bool GetOnlyReadMapFile(HANDLE& handle, LPVOID& buffer, const char* name)
     //GetLastError 检查 OpenFileMapping 状态
     LPVOID message = NULL;
     DWORD ErrorID = GetLastErrorFormatMessage(message);
-    std::stringstream info; info << "OpenFileMapping [" << name << "]  GetLastError:" << ErrorID << "  Message: " << (char*)message;
-    LOG4CPLUS_INFO(logger, LOG4CPLUS_STRING_TO_TSTRING(info.str()));
+    std::cout << "[ INFO] OpenFileMapping [" << name << "]  GetLastError:" << ErrorID << "  Message: " << (char*)message;
 
     if (ErrorID != 0 || handle == NULL) return false;
 
@@ -168,8 +168,7 @@ static bool GetOnlyReadMapFile(HANDLE& handle, LPVOID& buffer, const char* name)
     buffer = MapViewOfFile(handle, FILE_MAP_READ, 0, 0, 0);
     //GetLastError 检查 MapViewOfFile 状态
     ErrorID = GetLastErrorFormatMessage(message);
-    info.str("");  info << "MapViewOfFile [" << name << "]  GetLastError:" << ErrorID << "  Message:" << (char*)message;
-    LOG4CPLUS_INFO(logger, LOG4CPLUS_STRING_TO_TSTRING(info.str()));
+    std::cout << "[ INFO] MapViewOfFile   [" << name << "]  GetLastError:" << ErrorID << "  Message:" << (char*)message;
 
     if (ErrorID != 0 || buffer == NULL)
     {
@@ -182,11 +181,11 @@ static bool GetOnlyReadMapFile(HANDLE& handle, LPVOID& buffer, const char* name)
 
 //写入共享内存
 //返回写入耗时时间ms
-static bool WriteMapFile(HANDLE& handle, LPVOID& buffer, MapFileHeadInfo* info, const cv::Mat& frame)
+static bool WriteMapFile(HANDLE& handle, LPVOID& buffer, MapFileData* info, const cv::Mat& frame)
 {
     if (handle == NULL || buffer == NULL) return false;
 
-    static int offset = sizeof(MapFileHeadInfo);
+    static int offset = sizeof(MapFileData);
 
     info->fid += 1;
     info->copy(frame);

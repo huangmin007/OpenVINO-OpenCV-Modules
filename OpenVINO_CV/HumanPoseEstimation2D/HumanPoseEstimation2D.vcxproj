@@ -73,8 +73,8 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(INTEL_OPENVINO_DIR)\inference_engine\include;$(INTEL_OPENVINO_DIR)\opencv\include;..\OpenVINO_CV_Lib_Static;..\Libraries\log4cplus-2.0.4\include;..\Libraries\common\include;..\Libraries\gflags-2.2.2\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(INTEL_OPENVINO_DIR)\inference_engine\lib\intel64\Debug;$(INTEL_OPENVINO_DIR)\opencv\lib;..\Libraries\common\lib\Debug;..\Libraries\gflags-2.2.2\lib\Debug;..\Libraries\log4cplus-2.0.4\lib\Debug;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(INTEL_OPENVINO_DIR)\inference_engine\include;$(INTEL_OPENVINO_DIR)\opencv\include;..\OpenVINO_CV_Lib_Static;..\Libraries\common\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(INTEL_OPENVINO_DIR)\inference_engine\lib\intel64\Debug;$(INTEL_OPENVINO_DIR)\opencv\lib;..\Libraries\common\lib\Debug;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
@@ -84,8 +84,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(INTEL_OPENVINO_DIR)\inference_engine\include;$(INTEL_OPENVINO_DIR)\opencv\include;..\OpenVINO_CV_Lib_Static;..\Libraries\log4cplus-2.0.4\include;..\Libraries\common\include;..\Libraries\gflags-2.2.2\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(INTEL_OPENVINO_DIR)\inference_engine\lib\intel64\Release;$(INTEL_OPENVINO_DIR)\opencv\lib;..\Libraries\common\lib\Release;..\Libraries\gflags-2.2.2\lib\Release;..\Libraries\log4cplus-2.0.4\lib\Release;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(INTEL_OPENVINO_DIR)\inference_engine\include;$(INTEL_OPENVINO_DIR)\opencv\include;..\OpenVINO_CV_Lib_Static;..\Libraries\common\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(INTEL_OPENVINO_DIR)\inference_engine\lib\intel64\Release;$(INTEL_OPENVINO_DIR)\opencv\lib;..\Libraries\common\lib\Release;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -100,7 +100,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>gflags_static_debug.lib;log4cplusD.lib;shlwapi.lib;opencv_core430d.lib;opencv_videoio430d.lib;opencv_highgui430d.lib;opencv_imgproc430d.lib;opencv_imgcodecs430d.lib;inference_engine_legacyd.lib;inference_engined.lib;inference_engine_c_apid.lib;inference_engine_nn_builderd.lib;monitors.lib;pdh.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opencv_core430d.lib;opencv_videoio430d.lib;opencv_highgui430d.lib;opencv_imgproc430d.lib;opencv_imgcodecs430d.lib;inference_engine_legacyd.lib;inference_engined.lib;inference_engine_c_apid.lib;inference_engine_nn_builderd.lib;monitors.lib;pdh.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <LargeAddressAware>true</LargeAddressAware>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
     </Link>
@@ -159,7 +159,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>gflags_nothreads_static.lib;log4cplus.lib;shlwapi.lib;opencv_core430.lib;opencv_videoio430.lib;opencv_highgui430.lib;opencv_imgproc430.lib;opencv_imgcodecs430.lib;inference_engine_legacy.lib;inference_engine.lib;inference_engine_c_api.lib;inference_engine_nn_builder.lib;monitors.lib;pdh.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opencv_core430.lib;opencv_videoio430.lib;opencv_highgui430.lib;opencv_imgproc430.lib;opencv_imgcodecs430.lib;inference_engine_legacy.lib;inference_engine.lib;inference_engine_c_api.lib;inference_engine_nn_builder.lib;monitors.lib;pdh.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
@@ -171,7 +171,6 @@
     <ClCompile Include="render_human_pose.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="args.hpp" />
     <ClInclude Include="human_pose.hpp" />
     <ClInclude Include="human_pose_estimator.hpp" />
     <ClInclude Include="peak.hpp" />
