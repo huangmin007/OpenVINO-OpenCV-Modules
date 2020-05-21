@@ -1,0 +1,27 @@
+
+#系统环境变量 See ...\openvino\bin\setupvars.bat ...\openvino\opencv\setupvars.bat
+
+INTEL_OPENVINO_DIR		D:\Program Files (x86)\IntelSWTools\openvino
+INTEL_CVSDK_DIR			%INTEL_OPENVINO_DIR%
+OpenCV_DIR				%INTEL_OPENVINO_DIR%\opencv\cmake
+PYTHONPATH				%INTEL_OPENVINO_DIR%\deployment_tools\model_optimizer;
+InferenceEngine_DIR		%INTEL_OPENVINO_DIR%\deployment_tools\inference_engine\share
+HDDL_INSTALL_DIR		%INTEL_OPENVINO_DIR%\deployment_tools\inference_engine\external\hddl
+ARCH_ROOT_DIR			%INTEL_OPENVINO_DIR%\deployment_tools\inference_engine\bin\intel64\arch_descriptions
+ngraph_DIR				%INTEL_OPENVINO_DIR%\deployment_tools\ngraph\cmake
+
+
+PATH					%INTEL_OPENVINO_DIR%\opencv\bin;
+PATH					%INTEL_OPENVINO_DIR%\deployment_tools\model_optimizer;
+PATH					%INTEL_OPENVINO_DIR%\deployment_tools\inference_engine\external\tbb\bin;%INTEL_OPENVINO_DIR%\deployment_tools\inference_engine\bin\intel64\Release;%INTEL_OPENVINO_DIR%\deployment_tools\inference_engine\bin\intel64\Debug;%HDDL_INSTALL_DIR%\bin;
+PATH					%INTEL_OPENVINO_DIR%\deployment_tools\ngraph\lib;
+
+
+%INTEL_OPENVINO_DIR%\opencv\bin;
+%INTEL_OPENVINO_DIR%\deployment_tools\model_optimizer;
+%INTEL_OPENVINO_DIR%\deployment_tools\ngraph\lib;
+%INTEL_OPENVINO_DIR%\deployment_tools\inference_engine\external\tbb\bin;
+%INTEL_OPENVINO_DIR%\deployment_tools\inference_engine\bin\intel64\Release;
+%INTEL_OPENVINO_DIR%\deployment_tools\inference_engine\bin\intel64\Debug;
+%HDDL_INSTALL_DIR%\bin;
+				

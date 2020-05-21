@@ -7,9 +7,11 @@
 #include "cmdline.h"
 #include "OpenVINO_CV.h"
 
+// 内存还没有加读写锁，先测试后在看结果
 
 int main(int argc, char **argv)
 {
+    //std::cout << sizeof(InferenceData) << std::endl;
     cmdline::parser args;
 
     args.add<std::string>("help", 'h', "参数说明", false, "");
@@ -20,9 +22,8 @@ int main(int argc, char **argv)
     args.add<bool>("show", '\0', "是否显示视频窗口，用于调试", false, false);
     args.set_program_name("VideoSourceShared");
 
-    bool isParser = args.parse(argc, argv);
-    
-    if (args.exist("help"))// || argc == 1)
+    bool isParser = args.parse(argc, argv);    
+    if (args.exist("help"))
     {
         std::cerr << args.usage();
         return EXIT_SUCCESS;
@@ -43,40 +44,17 @@ int main(int argc, char **argv)
     std::string input = args.get<std::string>("input");
     if (input.find("cam:") == 0)
     {
-        //相机索引
-        int index = 0, w = 640, h = 480;
-        try
-        {
-            index = std::stoi(input.substr(4).c_str());
-            std::string size = args.get<std::string>("size");
-
-            //获取配置宽高信息
-            int x = size.find(',') > 0 ? size.find(',') : size.find('x') > 0 ? size.find('x') : -1;
-            if (x > 0)
-            {
-                w = std::stoi(size.substr(0, x));
-                h = std::stoi(size.substr(x + 1));
-            }
-        }
-        catch (std::exception & e)
-        {
-            std::cerr << "[ERROR] " << e.what() << std::endl;
-            return EXIT_FAILURE;
-        }
-
-        //打开相机，设置相机宽高属性
-        capture.open(index);
-        capture.set(cv::CAP_PROP_FRAME_WIDTH, w);
-        capture.set(cv::CAP_PROP_FRAME_HEIGHT, h);
-        std::cout << "[ INFO] Setting Camera Index:" << index << "  Size:" << w << "," << h << std::endl;
+        //相机 Index
+        int index = std::stoi(input.substr(4).c_str());
+        capture.open(index);        
+        std::cout << "[ INFO] Setting Camera Index:" << index <<  std::endl;
     }
     else if (input.find("url:") == 0)
     {
         //视频 URL 地址
         std::string url = input.substr(4);
         capture.open(url);
-
-        std::cout << input << std::endl;
+        std::cout << "[ INFO] Setting Video URL:" << url << std::endl;
     }
     else
     {
@@ -84,13 +62,32 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    if (!capture.isOpened())
+    int w = 640, h = 480;
+    try
     {
-        std::cerr << "[ERROR] 无法打开视频源：" << input << std::endl;
+        //获取配置宽高信息
+        std::string size = args.get<std::string>("size");
+        int c = size.find(',') > 0 ? size.find(',') : size.find('x') > 0 ? size.find('x') : -1;
+        if (c > 0)
+        {
+            w = std::stoi(size.substr(0, c));
+            h = std::stoi(size.substr(c + 1));
+        }
+    }
+    catch (std::exception & e)
+    {
+        std::cerr << "[ERROR] " << e.what() << std::endl;
         return EXIT_FAILURE;
     }
+    capture.set(cv::CAP_PROP_FRAME_WIDTH, w);
+    capture.set(cv::CAP_PROP_FRAME_HEIGHT, h);
+    std::cout << "[ INFO] Setting Source Size:" << w << "," << h << std::endl;
 
-    //if (args.get<bool>("show")) cv::namedWindow("Video Source");
+    if (!capture.isOpened())
+    {
+        std::cerr << "[ERROR] 无法打开视频或相机源：" << input << std::endl;
+        return EXIT_FAILURE;
+    }
 
     int width = capture.get(cv::CAP_PROP_FRAME_WIDTH);
     int height = capture.get(cv::CAP_PROP_FRAME_HEIGHT);
@@ -100,14 +97,13 @@ int main(int argc, char **argv)
 
     std::cout << "[ INFO] Capture Size:" << width << "," << height << "  FPS:" << fps << "  Count:" << count << "  Format:" << format << std::endl;
 
-    bool isLastFrame = false;
     cv::Mat srcFrame;
+    VideoSourceData vsData;
+    static int vsdSize = sizeof(VideoSourceData);
 
     LPVOID srcBuffer = NULL;
-    HANDLE srcMapFile = NULL;
-    MapFileData srcHeadInfo;
-    if (!CreateOnlyWriteMapFile(srcMapFile, srcBuffer, 
-        args.get<uint32_t>("fs") + sizeof(MapFileData),
+    HANDLE srcMapFile = NULL;    
+    if (!CreateOnlyWriteMapFile(srcMapFile, srcBuffer, args.get<uint32_t>("fs") + vsdSize,
         args.get<std::string>("fn").c_str()))
     {
         std::cerr << "[ERROR] 创建共享内存失败" << std::endl;
@@ -116,9 +112,9 @@ int main(int argc, char **argv)
 
     double use_time = 0.0;
     int waitDelay = WaitKeyDelay;
+    bool isShow = args.get<bool>("show");
     auto t0 = std::chrono::high_resolution_clock::now();
     auto t1 = std::chrono::high_resolution_clock::now();
-    bool isShow = args.get<bool>("show");
 
     while (true)
     {
@@ -126,11 +122,19 @@ int main(int argc, char **argv)
 
         t0 = std::chrono::high_resolution_clock::now();
         if (!capture.read(srcFrame))
-            if (srcFrame.empty()) break;
+        {
+            if (srcFrame.empty())
+            {
+                std::cerr << "[ERROR] 读取到空帧，或视频播放结束" << std::endl;
+                break;
+            }
+        }
 
         //写入到共享内存
-        if (!WriteMapFile(srcMapFile, srcBuffer, &srcHeadInfo, srcFrame))
-            std::cerr << "[ERROR] 写入到共享内存失败" << std::endl;
+        vsData.fid += 1;
+        vsData.copy(srcFrame);
+        std::copy((uint8_t*)&vsData, (uint8_t*)&vsData + vsdSize, (uint8_t*)srcBuffer);
+        std::copy((uint8_t*)srcFrame.data, (uint8_t*)srcFrame.data + vsData.length, (uint8_t*)srcBuffer + vsdSize);
 
         t1 = std::chrono::high_resolution_clock::now();
         use_time = std::chrono::duration_cast<ms>(t1 - t0).count();
@@ -138,7 +142,7 @@ int main(int argc, char **argv)
         waitDelay = WaitKeyDelay - use_time;
         waitDelay = waitDelay <= 0 ? 1 : waitDelay;
 
-        std::cout << "\33[K\r[ INFO] " << "Current Frame Read/Write Use :" << use_time << "ms";
+        std::cout << "\33[K\r[ INFO] " << "Current FrameID:" << vsData.fid << "  Read/Write Use:" << use_time << "ms";
 
         cv::waitKey(waitDelay);
         if (isShow) cv::imshow("Video Source", srcFrame);

@@ -15,27 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="framework.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="pch.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="OpenVINO_CV.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="cmdline.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="log.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="OpenVINO_CV_Lib_Static.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="pch.cpp">
+    <ClCompile Include="HumanPoseEstimation3D.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

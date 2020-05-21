@@ -14,6 +14,12 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "VideoSourceShared", "VideoSourceShared\VideoSourceShared.vcxproj", "{C7628109-9942-410D-AC75-8D220D732E9A}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "IEInfo", "IEInfo\IEInfo.vcxproj", "{A1802DAB-14B4-470C-BA31-C9E555C6DFBA}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HumanPoseEstimation3D", "HumanPoseEstimation3D\HumanPoseEstimation3D.vcxproj", "{F25064F8-E32C-47E7-9873-F8DC0FDB717B}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FaceDetection", "FaceDetection\FaceDetection.vcxproj", "{84F798AE-10D7-43D4-8B47-8E2B825FAADE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -46,6 +52,30 @@ Global
 		{C7628109-9942-410D-AC75-8D220D732E9A}.Release|x64.Build.0 = Release|x64
 		{C7628109-9942-410D-AC75-8D220D732E9A}.Release|x86.ActiveCfg = Release|Win32
 		{C7628109-9942-410D-AC75-8D220D732E9A}.Release|x86.Build.0 = Release|Win32
+		{A1802DAB-14B4-470C-BA31-C9E555C6DFBA}.Debug|x64.ActiveCfg = Debug|x64
+		{A1802DAB-14B4-470C-BA31-C9E555C6DFBA}.Debug|x64.Build.0 = Debug|x64
+		{A1802DAB-14B4-470C-BA31-C9E555C6DFBA}.Debug|x86.ActiveCfg = Debug|Win32
+		{A1802DAB-14B4-470C-BA31-C9E555C6DFBA}.Debug|x86.Build.0 = Debug|Win32
+		{A1802DAB-14B4-470C-BA31-C9E555C6DFBA}.Release|x64.ActiveCfg = Release|x64
+		{A1802DAB-14B4-470C-BA31-C9E555C6DFBA}.Release|x64.Build.0 = Release|x64
+		{A1802DAB-14B4-470C-BA31-C9E555C6DFBA}.Release|x86.ActiveCfg = Release|Win32
+		{A1802DAB-14B4-470C-BA31-C9E555C6DFBA}.Release|x86.Build.0 = Release|Win32
+		{F25064F8-E32C-47E7-9873-F8DC0FDB717B}.Debug|x64.ActiveCfg = Debug|x64
+		{F25064F8-E32C-47E7-9873-F8DC0FDB717B}.Debug|x64.Build.0 = Debug|x64
+		{F25064F8-E32C-47E7-9873-F8DC0FDB717B}.Debug|x86.ActiveCfg = Debug|Win32
+		{F25064F8-E32C-47E7-9873-F8DC0FDB717B}.Debug|x86.Build.0 = Debug|Win32
+		{F25064F8-E32C-47E7-9873-F8DC0FDB717B}.Release|x64.ActiveCfg = Release|x64
+		{F25064F8-E32C-47E7-9873-F8DC0FDB717B}.Release|x64.Build.0 = Release|x64
+		{F25064F8-E32C-47E7-9873-F8DC0FDB717B}.Release|x86.ActiveCfg = Release|Win32
+		{F25064F8-E32C-47E7-9873-F8DC0FDB717B}.Release|x86.Build.0 = Release|Win32
+		{84F798AE-10D7-43D4-8B47-8E2B825FAADE}.Debug|x64.ActiveCfg = Debug|x64
+		{84F798AE-10D7-43D4-8B47-8E2B825FAADE}.Debug|x64.Build.0 = Debug|x64
+		{84F798AE-10D7-43D4-8B47-8E2B825FAADE}.Debug|x86.ActiveCfg = Debug|Win32
+		{84F798AE-10D7-43D4-8B47-8E2B825FAADE}.Debug|x86.Build.0 = Debug|Win32
+		{84F798AE-10D7-43D4-8B47-8E2B825FAADE}.Release|x64.ActiveCfg = Release|x64
+		{84F798AE-10D7-43D4-8B47-8E2B825FAADE}.Release|x64.Build.0 = Release|x64
+		{84F798AE-10D7-43D4-8B47-8E2B825FAADE}.Release|x86.ActiveCfg = Release|Win32
+		{84F798AE-10D7-43D4-8B47-8E2B825FAADE}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

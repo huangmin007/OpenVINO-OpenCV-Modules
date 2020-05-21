@@ -6,8 +6,14 @@
 #include <winioctl.h>
 #include <opencv2/opencv.hpp>
 
+#define LOG(type)       (std::cout << "[" << std::setw(5) << std::right << type << "] ")
+#define LOGI_NFO            LOG("INFO")
+#define LOG_WARN            LOG("WARN")
+#define LOG_ERROR           LOG("ERROR")
+
+
 //以 1 字节对齐
-#pragma pack (1)
+#pragma pack(push, 1)
 
 //控制台线程运行状态，会监听 SetConsoleCtrlHandler 改变
 static bool IsRunning = true;
@@ -15,11 +21,11 @@ static const int WaitKeyDelay = 33;     //OpenCV cv::waitKey 默认参考延时
 
 typedef std::chrono::duration<double, std::ratio<1, 1000>> ms;
 
-// 内存共享文件数据格式
-// pack(1) 设计为 32 字节大小，数据信息建议不要超出 32 字节
-struct MapFileData
+// [内存共享数据] 视频或相机源数据格式
+// pack(1) 设计为 32 字节大小，数据头信息建议不要超出 32 字节
+struct VideoSourceData
 {
-    uint32_t    fid = 0;       //4字节，数据块每更新一次，该值会递增一次，可用于计算不做重复分析帧
+    uint32_t    fid = 0;        //Frame ID，数据块每更新一次，该值会递增一次，可用于计算不做重复分析帧
 
     /// Camera 参数
     uint16_t    width;          //视频或相机源宽
@@ -36,9 +42,9 @@ struct MapFileData
     uint32_t    reserve3 = 0;   //保留
     uint32_t    reserve4 = 0;   //保留
 
-    uint8_t     data[];         //数据
+    //uint8_t     *data;          //raw data
 
-    //copy Mat info to MapFileHeadInfo
+    //copy Mat info to VideoSourceData
     void copy(const cv::Mat& src)
     {
         this->width = src.cols;
@@ -49,8 +55,8 @@ struct MapFileData
         this->length = this->width * this->height * this->channels * src.elemSize1();
     };
 
-    //copy Mat info to MapFileHeadInfo
-    MapFileData& operator << (const cv::Mat& src)
+    //copy Mat info to VideoSourceData
+    VideoSourceData& operator << (const cv::Mat& src)
     {
         this->width = src.cols;
         this->height = src.rows;
@@ -62,8 +68,8 @@ struct MapFileData
     };
 };
 
-// 输出结果数据格式
-enum ResultDataFormat:uint8_t
+// 数据格式
+enum InferenceDataFormat:uint8_t
 {
     RAW,        //原始字节数据，可将原始字节转为指定的结构数据
     STRING,     //字符类型，未定义字符格式，但有一定规则
@@ -71,14 +77,14 @@ enum ResultDataFormat:uint8_t
     XML,        //字符类型，定义为 XML 格式
 };
 
-// 输出数据结构
-// pack(1) 设计为 32 字节大小，数据信息建议不要超出 32 字节
-struct OutputData
+// [内存共享数据] 推理结果的数据结构
+// pack(1) 设计为 32 字节大小，数据头信息建议不要超出 32 字节
+struct InferenceData
 {
     uint32_t    fid = 0;        //帧 id
     uint8_t     mid;            //这里应该是指模块ID，由哪个模块输出的数据
     uint32_t    length;         //数据的有效长度
-    uint8_t     format;         //数据格式，see ResultDataFormat
+    InferenceDataFormat     format;         //数据格式，see InferenceDataFormat
 
     uint16_t    reserve0 = 0;
     uint32_t    reserve1 = 0;
@@ -87,12 +93,12 @@ struct OutputData
     uint32_t    reserve4 = 0;
     uint32_t    reserve5 = 0;
 
-    uint8_t     data[];         //数据，不同的结果类型，数据的解释不一样，应该数据的有效长度动态
+    //uint8_t     data[];         //raw data，不同的结果类型，数据的解释不一样，应该数据的有效长度动态
 };
 
 struct PoseData2D
 {
-    uint32_t had;
+    
 };
 
 //SetConsoleCtrlHandler
@@ -179,19 +185,4 @@ static bool GetOnlyReadMapFile(HANDLE& handle, LPVOID& buffer, const char* name)
     return true;
 }
 
-//写入共享内存
-//返回写入耗时时间ms
-static bool WriteMapFile(HANDLE& handle, LPVOID& buffer, MapFileData* info, const cv::Mat& frame)
-{
-    if (handle == NULL || buffer == NULL) return false;
-
-    static int offset = sizeof(MapFileData);
-
-    info->fid += 1;
-    info->copy(frame);
-
-    std::copy((uint8_t*)info, (uint8_t*)info + offset, (uint8_t*)buffer);
-    std::copy((uint8_t*)frame.data, (uint8_t*)frame.data + info->length, (uint8_t*)buffer + offset);
-
-    return true;
-}
+#pragma pack(pop)
