@@ -15,9 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="FaceDetection.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="detectors.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -25,6 +22,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="visualizer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="FaceDetection.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

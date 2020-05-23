@@ -18,7 +18,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "IEInfo", "IEInfo\IEInfo.vcx
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HumanPoseEstimation3D", "HumanPoseEstimation3D\HumanPoseEstimation3D.vcxproj", "{F25064F8-E32C-47E7-9873-F8DC0FDB717B}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FaceDetection", "FaceDetection\FaceDetection.vcxproj", "{84F798AE-10D7-43D4-8B47-8E2B825FAADE}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "InteractiveFaceDetection", "InteractiveFaceDetection\InteractiveFaceDetection.vcxproj", "{84F798AE-10D7-43D4-8B47-8E2B825FAADE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

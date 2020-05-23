@@ -5,7 +5,8 @@
 #include <opencv2/opencv.hpp>
 #include <Windows.h>
 #include "cmdline.h"
-#include "OpenVINO_CV.h"
+#include "io_data_format.hpp"
+#include "static_functions.hpp"
 
 // 内存还没有加读写锁，先测试后在看结果
 

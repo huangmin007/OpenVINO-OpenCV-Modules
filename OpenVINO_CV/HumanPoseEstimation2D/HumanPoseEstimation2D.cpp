@@ -15,7 +15,8 @@
 #include "human_pose_estimator.hpp"
 
 #include "cmdline.h"
-#include "OpenVINO_CV.h"
+#include "io_data_format.hpp"
+#include "static_functions.hpp"
 
 //Mat BGR
 
@@ -38,6 +39,7 @@ static std::string GetAvailableDevices()
 int main(int argc, char** argv)
 {
     //解析参数
+#if 1
     cmdline::parser args;
 
     args.add<std::string>("help", 'h', "参数说明", false, "");
@@ -54,7 +56,19 @@ int main(int argc, char** argv)
     args.add<bool>("pc", 0, "启用每层性能报告", false, false);
     args.add<std::string>("um", 0, "最初显示的监视器列表", false, "");
     args.set_program_name("HumanPoseEstimation2D");
+#endif
+#if testa
+    cmdline::parser args;
+    args.add<std::string>("help", 'h', "参数说明", false, "");
+    args.add<std::string>("input", 'i', "输入源参数，格式：(video|camera|shared|socket)[:value[:value[:...]]]", false, "cam:0");
+    args.add<std::string>("output", 'o', "输出源参数，格式：(shared|console|socket)[:value[:value[:...]]]", false, "shared:osource.bin");
+    args.add<std::string>("model", 'm', "用于 AI识别检测 的 网络模型名称/文件(.xml)和目标设备，格式：(AI模型名称)[:精度[:硬件]]，"
+        "示例：face-detection-adas-0001:FP16:CPU 或 face-detection-adas-0001:FP16:HETERO:&lt;CPU,GPU&gt;", false, "human-pose-estimation-0001:FP16:CPU");
 
+    args.add<bool>("pc", 0, "启用每层性能报告", false, false);
+    args.add<bool>("show", 0, "是否显示视频窗口，用于调试", false, false);
+    args.set_program_name("HumanPoseEstimation2D");
+#endif
     bool isParser = args.parse(argc, argv);
     if (args.exist("help"))
     {
@@ -91,8 +105,8 @@ int main(int argc, char** argv)
     if (!GetOnlyReadMapFile(sMapFile, sBuffer, args.get<std::string>("rfn").c_str())) return EXIT_FAILURE;    
     if (!CreateOnlyWriteMapFile(dMapFile, dBuffer, args.get<uint32_t>("wfs"), args.get<std::string>("wfn").c_str())) return EXIT_FAILURE;
 
-    InferenceData data;    //输出数据
-    static int odSize = sizeof(InferenceData);   //OutputData 结构数据大小
+    OutputSourceData data;    //输出数据
+    static int odSize = sizeof(OutputSourceData);   //OutputData 结构数据大小
     
     cv::Mat frame;
     VideoSourceData head;       //文件头信息
@@ -161,7 +175,7 @@ int main(int argc, char** argv)
                 data.mid = 0;
                 data.fid = head.fid;
                 data.length = pose.length();
-                data.format = InferenceDataFormat::XML;
+                data.format = OutputFormat::XML;
                 //写入共享内存
                 std::copy((uint8_t*)&data, (uint8_t*)&data + odSize, (uint8_t*)dBuffer);
                 std::copy(pose.c_str(), pose.c_str() + pose.length(), (char*)dBuffer + odSize);

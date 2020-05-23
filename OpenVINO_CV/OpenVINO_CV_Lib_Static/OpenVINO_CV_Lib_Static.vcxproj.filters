@@ -21,13 +21,22 @@
     <ClInclude Include="pch.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="OpenVINO_CV.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="cmdline.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="log.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="static_functions.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="io_data_format.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="input_source.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="output_source.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
@@ -36,6 +45,12 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="pch.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="output_source.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="input_source.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

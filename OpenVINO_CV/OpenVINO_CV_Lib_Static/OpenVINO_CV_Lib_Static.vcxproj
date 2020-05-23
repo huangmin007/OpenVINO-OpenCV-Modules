@@ -75,6 +75,7 @@
     <IncludePath>$(INTEL_OPENVINO_DIR)\opencv\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(LibraryPath)</LibraryPath>
     <SourcePath>$(SourcePath)</SourcePath>
+    <OutDir>$(SolutionDir)Libraries\openvino_cv\lib\$(Configuration)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
@@ -86,13 +87,14 @@
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(INTEL_OPENVINO_DIR)\opencv\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(LibraryPath)</LibraryPath>
+    <OutDir>$(SolutionDir)Libraries\openvino_cv\lib\$(Configuration)\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_LIB;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
@@ -140,7 +142,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_LIB;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
@@ -154,12 +156,17 @@
   <ItemGroup>
     <ClInclude Include="cmdline.h" />
     <ClInclude Include="framework.h" />
+    <ClInclude Include="input_source.hpp" />
+    <ClInclude Include="io_data_format.hpp" />
     <ClInclude Include="log.h" />
-    <ClInclude Include="OpenVINO_CV.h" />
+    <ClInclude Include="output_source.hpp" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="static_functions.hpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="input_source.cpp" />
     <ClCompile Include="OpenVINO_CV_Lib_Static.cpp" />
+    <ClCompile Include="output_source.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
