@@ -8,6 +8,8 @@
 #include <iostream>
 #include <Windows.h>
 #include <winioctl.h>
+#include <inference_engine.hpp>
+
 
 #include "cmdline.h"
 
@@ -37,6 +39,39 @@ static const int WaitKeyDelay = 33;
 /// </summary>
 static bool IsRunning = true;
 
+/// <summary>
+/// 输出 InferenceEngine 引擎版本，及可计算设备列表
+/// </summary>
+static void InferenceEngineInfomation()
+{
+    static size_t width = 16;
+
+    //-------------------------------- 版本信息 --------------------------------
+    const InferenceEngine::Version* ie_version = InferenceEngine::GetInferenceEngineVersion();
+
+    std::cout.setf(std::ios::left);
+    std::cout << "[InferenceEngine]" << std::endl;
+    std::cout << std::setw(width) << "Version:" << ie_version << std::endl;
+    std::cout << std::setw(width) << "Major:" << ie_version->apiVersion.major << std::endl;
+    std::cout << std::setw(width) << "Minor:" << ie_version->apiVersion.minor << std::endl;
+    std::cout << std::setw(width) << "BuildNumber:" << ie_version->buildNumber << std::endl;
+    std::cout << std::setw(width) << "Description:" << ie_version->description << std::endl;
+
+    //-------------------------------- 支持的硬件设备 --------------------------------
+    InferenceEngine::Core core;
+    std::vector<std::string> devices = core.GetAvailableDevices();
+
+    std::cout << "[SupportDevices]" << std::endl;
+    for (const auto& device : devices)
+    {
+        std::string dn = core.GetMetric(device, METRIC_KEY(FULL_DEVICE_NAME)).as<std::string>();
+
+        std::cout << std::setw(width) << " (" << device << ") " << dn << std::endl;
+    }
+    std::cout << std::endl;
+
+    system("pause");
+}
 
 /// <summary>
 /// 控制台程序操作关闭或退出处理，WinAPI 函数 SetConsoleCtrlHandler 调用
@@ -45,6 +80,7 @@ static bool IsRunning = true;
 /// <returns></returns>
 static BOOL CloseHandlerRoutine(DWORD CtrlType)
 {
+    std::cout << "SetConsoleCtrlHandler:::" << CtrlType << std::endl;
     switch (CtrlType)
     {
     //当用户按下了CTRL+C,或者由GenerateConsoleCtrlEvent API发出
@@ -144,31 +180,62 @@ static bool GetOnlyReadMapFile(HANDLE& handle, LPVOID& buffer, const char* name)
 }
 
 /// <summary>
-/// [参考用的]创建通用参数解析器；已经添加了 help/input/output/model/pc/async/show 参数
+/// [参考用的]创建通用参数解析；已经添加了 help/info/input/output/model/async/show 参数
 /// </summary>
+/// <param name="args">参数解析对象</param>
 /// <param name="program_name">程序名称</param>
+/// <param name="default_model">默认的模型配置参数</param>
 /// <returns></returns>
 static void CreateGeneralCmdLine(cmdline::parser & args, const std::string &program_name, const std::string &default_model)
 {
-    args.add<std::string>("help", 'h', "参数说明", false, "");
+    args.add("help", 'h', "参数说明");
+    args.add("info", 0, "Inference Engine Infomation");
+
     args.add<std::string>("input", 'i', "输入源参数，格式：(video|camera|shared|socket)[:value[:value[:...]]]", false, "cam:0");
-    args.add<std::string>("output", 'o', "输出源参数，格式：(shared|console|socket)[:value[:value[:...]]]", false, "console:TEST");// "shared:o_source.bin");
+    args.add<std::string>("output", 'o', "输出源参数，格式：(shared|console|socket)[:value[:value[:...]]]", false, "shared:o_source.bin");// "shared:o_source.bin");
     args.add<std::string>("model", 'm', "用于 AI识别检测 的 网络模型名称/文件(.xml)和目标设备，格式：(AI模型名称)[:精度[:硬件]]，"
-        "示例：face-detection-adas-0001:FP16:CPU 或 face-detection-adas-0001:FP16:HETERO:&lt;CPU,GPU&gt;", default_model.empty(), default_model);
+        "示例：face-detection-adas-0001:FP16:CPU 或 face-detection-adas-0001:FP16:HETERO:CPU,GPU", default_model.empty(), default_model);
     
-    args.add<bool>("pc", 0, "启用每层性能报告", false, false);
     args.add<bool>("async", 0, "是否异步分析识别", false, true);
+
+#ifdef _DEBUG
     args.add<bool>("show", 0, "是否显示视频窗口，用于调试", false, true);
+#else
+    args.add<bool>("show", 0, "是否显示视频窗口，用于调试", false, false);
+#endif
+
     args.set_program_name(program_name);
+}
+
+static const std::map<std::string, std::string> ParseArgsForInput(const std::string& args)
+{
+    std::map<std::string, std::string> argMap;
+    argMap["type"] = "";
+    if (args.empty()) return argMap;
+
+    size_t start = 0;
+    size_t end = args.find(Delimiter);
+    std::string head = args.substr(start, end);
+
+    if (head == "cam" || head == "camera")
+    {
+        argMap["type"] = "camera";
+        argMap["index"] = "0";
+        argMap["size"] = "640x480";
+        if (end == std::string::npos)
+        {
+        }
+    }
+
 }
 
 /// <summary>
 /// 解析输入模型参数
-/// <para>输入格式为：(AI模型名称)[:精度[:硬件]]，示例：face-detection-adas-0001:FP16:CPU 或 face-detection-adas-0001:FP16:HETERO:&lt;CPU,GPU&gt; </para>
+/// <para>输入格式为：(AI模型名称)[:精度[:硬件]]，示例：face-detection-adas-0001:FP16:CPU 或 face-detection-adas-0001:FP16:HETERO:CPU,GPU </para>
 /// </summary>
 /// <param name="args"></param>
 /// <returns>返回具有 ["model"/"name","fp","device","path"/"file"] 属性的 std::map 数据</returns>
-static const std::map<std::string, std::string> ParseArgsForModel(std::string args)
+static const std::map<std::string, std::string> ParseArgsForModel(const std::string &args)
 {
     std::stringstream path;
     std::map<std::string, std::string> argMap;
@@ -239,7 +306,7 @@ static const std::vector<std::string> SplitString(const std::string& src, const 
     {
         vec.push_back(src.substr(start, end - start));
 
-        start = end;
+        start = end + 1;
         end = src.find(delimiter, start);
     }
 

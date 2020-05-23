@@ -6,7 +6,7 @@
 #include <opencv2/opencv.hpp>
 
 //默认的共享输入源名称
-#define	SHARED_INPUT_SOURCE_NAME  "i_source.bin"
+#define	SHARED_INPUT_SOURCE_NAME  "source.bin"
 
 
 /// <summary>
@@ -16,6 +16,7 @@ enum SourceProperties : uint16_t
 {
 	FRAME_ID = 0xFF00,			//帧ID
 	MODULE_ID = 0xFF01,			//模块ID
+	OUTPUT_FORMAT = 0xFF02,		//输出格式
 };
 
 

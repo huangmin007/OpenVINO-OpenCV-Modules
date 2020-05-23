@@ -15,7 +15,8 @@
 #include "human_pose_estimator.hpp"
 
 #include "cmdline.h"
-#include "io_data_format.hpp"
+#include "input_source.hpp"
+#include "output_source.hpp"
 #include "static_functions.hpp"
 
 //Mat BGR
@@ -38,41 +39,43 @@ static std::string GetAvailableDevices()
 
 int main(int argc, char** argv)
 {
-    //解析参数
-#if 1
+    //---------------- 第零步：配置控制台事件处理 --------------
+    if (SetConsoleCtrlHandler((PHANDLER_ROUTINE)CloseHandlerRoutine, TRUE) == FALSE)
+    {
+        std::cerr << "[ERROR] Unable to Install Close Handler Routine!" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+#pragma region cmdline参数设置解析
+    //---------------- 第一步：设计输入参数 --------------
     cmdline::parser args;
+    args.add("help", 'h', "参数说明");
+    args.add("info", 0, "Inference Engine Infomation");
 
-    args.add<std::string>("help", 'h', "参数说明", false, "");
-    args.add<std::string>("model", 'm', "人体姿势估计模型（.xml）文件", false, "models/human-pose-estimation-0001/FP16/human-pose-estimation-0001.xml");
-    args.add<std::string>("device", 'd', "指定用于 人体姿势评估 的目标设备", false, "CPU");
-    
-    args.add<std::string>("rfn", 0, "用于读取AI分析的数据内存共享名称", false, "source.bin");
-    args.add<std::string>("wfn", 0, "用于存储AI分析结果数据的内存共享名称", false, "pose2d.bin");
-    args.add<uint32_t>("wfs", 0, "用于存储AI分析结果数据的内存大小，默认：1024*1024(Bytes)", false, 1024 * 1024);
-
-    args.add<bool>("show", 0, "是否显示视频窗口，用于调试", false, false);
-    args.add<bool>("output", 0, "在控制台上输出推断结果信息", false, false);
-
-    args.add<bool>("pc", 0, "启用每层性能报告", false, false);
-    args.add<std::string>("um", 0, "最初显示的监视器列表", false, "");
-    args.set_program_name("HumanPoseEstimation2D");
-#endif
-#if testa
-    cmdline::parser args;
-    args.add<std::string>("help", 'h', "参数说明", false, "");
     args.add<std::string>("input", 'i', "输入源参数，格式：(video|camera|shared|socket)[:value[:value[:...]]]", false, "cam:0");
-    args.add<std::string>("output", 'o', "输出源参数，格式：(shared|console|socket)[:value[:value[:...]]]", false, "shared:osource.bin");
+    args.add<std::string>("output", 'o', "输出源参数，格式：(shared|console|socket)[:value[:value[:...]]]", false, "shared:pose2d_output.bin");
     args.add<std::string>("model", 'm', "用于 AI识别检测 的 网络模型名称/文件(.xml)和目标设备，格式：(AI模型名称)[:精度[:硬件]]，"
-        "示例：face-detection-adas-0001:FP16:CPU 或 face-detection-adas-0001:FP16:HETERO:&lt;CPU,GPU&gt;", false, "human-pose-estimation-0001:FP16:CPU");
-
-    args.add<bool>("pc", 0, "启用每层性能报告", false, false);
+        "示例：human-pose-estimation-0001:FP16:CPU 或 human-pose-estimation-0001:FP16:HETERO:CPU,GPU", false, "human-pose-estimation-0001:FP16:CPU");
+    
+    args.add<bool>("async", 0, "是否异步分析识别", false, true);
+#ifdef _DEBUG
+    args.add<bool>("show", 0, "是否显示视频窗口，用于调试", false, true);
+#else
     args.add<bool>("show", 0, "是否显示视频窗口，用于调试", false, false);
-    args.set_program_name("HumanPoseEstimation2D");
 #endif
+    args.set_program_name("HumanPoseEstimation2D");
+    
+    LOG("INFO") << "参数解析 ... " << std::endl;
+    //----------------- 第二步：解析输入参数 ----------------
     bool isParser = args.parse(argc, argv);
     if (args.exist("help"))
     {
         std::cerr << args.usage();
+        return EXIT_SUCCESS;
+    }
+    if (args.exist("info"))
+    {
+        InferenceEngineInfomation();
         return EXIT_SUCCESS;
     }
     if (!isParser)
@@ -80,143 +83,159 @@ int main(int argc, char** argv)
         std::cerr << "[ERROR] " << args.error() << std::endl << args.usage();
         return EXIT_SUCCESS;
     }
+#pragma endregion
 
-    if (SetConsoleCtrlHandler((PHANDLER_ROUTINE)CloseHandlerRoutine, TRUE) == FALSE)
-    {
-        std::cerr << "[ERROR] Unable to Install Close Handler Routine!" << std::endl;
-        return EXIT_FAILURE;
-    }
-
+    // --------- 第二点一步：获取或定义参数 -----
     bool show = args.get<bool>("show");
-    bool output = args.get<bool>("output");
-    std::string model = args.get<std::string>("model");
-    std::string device = args.get<std::string>("device");
+    std::map<std::string, std::string> model = ParseArgsForModel(args.get<std::string>("model"));
+    if (model["path"].empty()) throw std::invalid_argument("AI模型参数错误：" + args.get<std::string>("model"));
 
-    //引擎信息
-    std::cout << "[ INFO] InferenceEngine: " << InferenceEngine::GetInferenceEngineVersion() << std::endl;
-#if 会导致共享内存句柄获取失败？？
-    std::cout << "[ INFO] 可用目标设备:" << GetAvailableDevices() << std::endl;
-#endif
-    std::cout << "[ INFO] AI模型文件：" << model << std::endl;
-
-    std::cout << "[ INFO] 获取/创建内存共享数据文件 ......" << std::endl;
-    LPVOID sBuffer = NULL, dBuffer = NULL;
-    HANDLE sMapFile = NULL, dMapFile = NULL;
-    if (!GetOnlyReadMapFile(sMapFile, sBuffer, args.get<std::string>("rfn").c_str())) return EXIT_FAILURE;    
-    if (!CreateOnlyWriteMapFile(dMapFile, dBuffer, args.get<uint32_t>("wfs"), args.get<std::string>("wfn").c_str())) return EXIT_FAILURE;
-
-    OutputSourceData data;    //输出数据
-    static int odSize = sizeof(OutputSourceData);   //OutputData 结构数据大小
+    bool isLastFrame = false;
+    bool isAsyncMode = args.get<bool>("async");         //总是在SYNC模式下开始执行
+    bool isModeChanged = true;                          //更改执行模式时设置为true（SYNC <-> ASYNC）
     
-    cv::Mat frame;
-    VideoSourceData head;       //文件头信息
-    uint32_t lastFrameId = 0;   //上一帧id
-    static int hdSize = sizeof(VideoSourceData);    //MapFileHeadInfo 结构数据大小
+    std::stringstream x_data;
+    std::vector<HumanPose> poses;                       //预测的姿态数据
+    std::string title = "Human Pose Estimation [" + args.get<std::string>("model") + "]";
 
-    std::cout << "[ INFO] 模型加载分析中 ......" << std::endl;
-    std::vector<HumanPose> poses;   //预测的姿态数据
-    HumanPoseEstimator estimator(model, device, args.get<bool>("pc"));
-    
-    //读取第一帧数据
-    std::copy((uint8_t*)sBuffer, (uint8_t*)sBuffer + hdSize, reinterpret_cast<uint8_t*>(&head));
-    if (frame.empty())  frame.create(head.height, head.width, head.type);
-    std::copy((uint8_t*)sBuffer + hdSize, (uint8_t*)sBuffer + hdSize + head.length, frame.data);
-
-    estimator.reshape(frame);   // 如果发生网络重塑，请勿进行测量
-    cv::Size graphSize{ static_cast<int>(head.width / 4), 60 };
-    Presenter presenter(args.get<std::string>("um"), head.height - graphSize.height - 10, graphSize);
-    
-    int waitDelay = 1;
-    double use_time = 0.0;
+    int delay = WaitKeyDelay;
+    double total_use_time = 0.0f;
     auto t0 = std::chrono::high_resolution_clock::now();
     auto t1 = std::chrono::high_resolution_clock::now();
 
+
+    //----------------- 第三步：加载分析模型 ----------------
+    HumanPoseEstimator estimator(model["path"], model["device"], false);
+
+    //----------------- 第四步：创建 输入/输出 源 ----------------
+    InputSource capture;
+    capture.open(args.get<std::string>("input"));
+    OutputSource output;
+    output.open(args.get<std::string>("output"));
+
+    //读取第一帧数据
+    size_t fid = 0;
+    cv::Mat curr_frame, next_frame;
+    capture.read(curr_frame, fid);
+    
+    estimator.reshape(curr_frame);   // 如果发生网络重塑，请勿进行测量
+    cv::Size graphSize{ static_cast<int>(curr_frame.cols / 4), 60 };
+    Presenter presenter("", curr_frame.rows - graphSize.height - 10, graphSize);
+    
     while (true)
     {
         if (!IsRunning) break;
-
         t0 = std::chrono::high_resolution_clock::now();
-        std::copy((uint8_t*)sBuffer, (uint8_t*)sBuffer + hdSize, reinterpret_cast<uint8_t*>(&head));
-        
-        //重复帧，不在读取
-        if (lastFrameId != head.fid)
+
+        //这是第一个异步点
+        //在异步模式下，我们捕获帧以填充下一个推断请求
+        //在常规模式下，我们捕获到当前推断请求的帧
+        size_t next_fid = 0;
+        if (!capture.read(next_frame, next_fid))
         {
-            std::copy((uint8_t*)sBuffer + hdSize, (uint8_t*)sBuffer + hdSize + head.length, frame.data);
+            if (next_frame.empty())
+                isLastFrame = true;
+            else
+                throw std::logic_error("无法从输入源获取数据帧");
+        }
 
-            estimator.frameToBlobCurr(frame);
+        //异步分析
+        if (isAsyncMode) 
+        {
+            if (isModeChanged)  estimator.frameToBlobCurr(curr_frame);
+            if (!isLastFrame)   estimator.frameToBlobNext(next_frame);
+        }
+        else if (!isModeChanged) {
+            estimator.frameToBlobCurr(curr_frame);
+        }
+
+        // 主同步点
+        // 在真正的异步模式下，我们开始下一个推断请求，同时等待当前完成
+        // 在常规模式下，我们启动当前请求，并立即等待其完成
+        if (isAsyncMode) 
+        {
+            if (isModeChanged) estimator.startCurr();
+            if (!isLastFrame)  estimator.startNext();
+        }
+        else if (!isModeChanged) {
             estimator.startCurr();
+        }
 
-            if (estimator.readyCurr())
+        if (estimator.readyCurr()) 
+        {
+            poses = estimator.postprocessCurr();
+
+#pragma region OutputSource
+            x_data.str("");
+            x_data << "<data>\r\n";
+            x_data << "\t<fid>" << fid << "</fid>\r\n";
+            x_data << "\t<count>" << poses.size() << "</count>\r\n";
+            x_data << "\t<name>HumanPoseEstimation2D</name>\r\n";
+            //x_data << "\t<keypoints>ears,eyes,nose,neck,shoulders,elbows,wrists,hips,knees,ankles</keypoints>\r\n";
+            x_data << "\t<keypoints>neck,nose,l_shoulder,l_elbow,l_wrist,l_hip,l_knee,l_ankle,r_shoulder,r_elbow,r_wrist,r_hip,r_knee,r_ankle,r_eye,l_eye,r_ear,l_ear</keypoints>\r\n";
+
+            for (HumanPose const& pose : poses)
             {
-                std::stringstream rawPose;
-                poses = estimator.postprocessCurr();
-                
-                rawPose << "<data>\r\n";
-                rawPose << "\t<fid>" << head.fid << "</fid>\r\n";
-                rawPose << "\t<count>" << poses.size() << "</count>\r\n";
-                rawPose << "\t<name>HumanPoseEstimation2D</name>\r\n";
-                rawPose << "\t<keypoints>ears,eyes,nose,neck,shoulders,elbows,wrists,hips,knees,ankles</keypoints>\r\n";
-                //rawPose << "\t<keypoints>neck,nose,l_shoulder,l_elbow,l_wrist,l_hip,l_knee,l_ankle,r_shoulder,r_elbow,r_wrist,r_hip,r_knee,r_ankle,r_eye,l_eye,r_ear,l_ear</keypoints>\r\n";
+                x_data << "\t<pose source=\"" << pose.score << "\">\r\n";
+                for (auto const& keypoint : pose.keypoints)
+                    x_data << "\t\t<position>" << keypoint.x << "," << keypoint.y << "</position>\r\n";
 
-                for (HumanPose const& pose : poses)
-                {
-                    rawPose << "\t<pose source=\"" << pose.score << "\">\r\n";
-                    for (auto const& keypoint : pose.keypoints)
-                        rawPose << "\t\t<position>" << keypoint.x << "," << keypoint.y << "</position>\r\n";
-                    
-                    rawPose << "\t</pose>\r\n";
-                }
-                rawPose << "</data>";
+                x_data << "\t</pose>\r\n";
+            }
+            x_data << "</data>";
 
-                std::string pose = rawPose.str();
-                if (output)
-                    std::cout << "::Source::" << std::endl << pose << std::endl;
+            output.set(SourceProperties::OUTPUT_FORMAT, (uint8_t)OutputFormat::XML);
+            output.write((uint8_t*)x_data.str().c_str(), x_data.str().length(), fid);
+#pragma endregion
 
-                data.mid = 0;
-                data.fid = head.fid;
-                data.length = pose.length();
-                data.format = OutputFormat::XML;
-                //写入共享内存
-                std::copy((uint8_t*)&data, (uint8_t*)&data + odSize, (uint8_t*)dBuffer);
-                std::copy(pose.c_str(), pose.c_str() + pose.length(), (char*)dBuffer + odSize);
+            if (show)
+            {                
+                presenter.drawGraphs(curr_frame);
+                renderHumanPose(poses, curr_frame);
 
-                if (show)
-                {
-                    presenter.drawGraphs(frame);
-                    renderHumanPose(poses, frame);
-                }
-#if TestOutput
-                OutputData* t = reinterpret_cast<OutputData*>(dBuffer);
-                std::cout << "Size:" << sizeof(OutputData) << " fid:" << t->fid << " len:" << t->length << std::endl;
-                
-                char *ss = new char[t->length + 1];
-                std::copy((char*)dBuffer + odSize, (char*)dBuffer + odSize + t->length, ss);
-                ss[t->length + 1] = '\0';
-                std::cout << "Memory::" << ss << std::endl;
-#endif
+                std::ostringstream txt;
+                txt << "Frame ID:" << fid << "  Total Use Time: " << total_use_time << " ms";
+                cv::putText(curr_frame, txt.str(), cv::Point2f(10, 25), cv::FONT_HERSHEY_COMPLEX, 0.6, cv::Scalar(255, 0, 0));
+
+                cv::imshow(title, curr_frame);
             }
         }
-    
+
+        if (!show || output.getType() != OutputType::CONSOLE)
+            std::cout << "\33[2K\r[ INFO] " << "Frame ID:" << fid << "    Total Use Time:" << total_use_time << "ms";
+
+        if (isLastFrame)  break;
+        if (isModeChanged) isModeChanged = false;
+
         t1 = std::chrono::high_resolution_clock::now();
-        use_time = std::chrono::duration_cast<ms>(t1 - t0).count();
-        if(!output) std::cout << "\33[2K\r[ INFO] " << "Current FrameID:" << head.fid << "  Inference Use:" << use_time << "ms";
+        total_use_time = std::chrono::duration_cast<ms>(t1 - t0).count();
+        delay = WaitKeyDelay - total_use_time;
+        if (delay <= 0) delay = 1;
 
-        waitDelay = WaitKeyDelay - use_time;
-        cv::waitKey(waitDelay <= 0 ? 1 : waitDelay);
-        if (show) cv::imshow("Human Pose Estimation 2D (" + device + ")", frame);
-        
-        lastFrameId = head.fid;
+        fid = next_fid;
+        // 在真正的异步模式下，我们将NEXT和CURRENT请求交换给下一个迭代
+        curr_frame = next_frame;
+        next_frame = cv::Mat();
+        if (isAsyncMode) estimator.swapRequest();
+
+        const int key = cv::waitKey(delay) & 255;
+        if (key == 'p') {
+            delay = (delay == 0) ? 33 : 0;
+        }
+        else if (27 == key) { // Esc
+            break;
+        }
+        else if (9 == key) { // Tab
+            isAsyncMode ^= true;
+            isModeChanged = true;
+        }
+        if(show)    presenter.handleKey(key);
     }
-
     std::cout << std::endl;
-    cv::destroyAllWindows();
 
-    //撤消地址空间内的视图
-    if (sBuffer != NULL) UnmapViewOfFile(sBuffer);
-    if (dBuffer != NULL) UnmapViewOfFile(dBuffer);
-    //关闭共享文件句柄
-    if (sMapFile != NULL) CloseHandle(sMapFile);
-    if (dMapFile != NULL) CloseHandle(dMapFile);
+    capture.release();
+    output.release();
+    if(show)    cv::destroyAllWindows();
 
     std::cout << "[ INFO] Exiting ..." << std::endl;
     Sleep(500); 

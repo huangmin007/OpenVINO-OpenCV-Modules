@@ -12,12 +12,17 @@
 
 int main(int argc, char **argv)
 {
-    //std::cout << sizeof(InferenceData) << std::endl;
-    cmdline::parser args;
+    if (SetConsoleCtrlHandler((PHANDLER_ROUTINE)CloseHandlerRoutine, TRUE) == FALSE)
+    {
+        std::cerr << "[ERROR] Unable to Install Close Handler Routine!" << std::endl;
+        return EXIT_FAILURE;
+    }
 
+    cmdline::parser args;
     args.add<std::string>("help", 'h', "参数说明", false, "");
-    args.add<std::string>("input", 'i', "输入视频或相机源，示例：-i url:<path> 或 -i cam:<index>", false, "cam:0");
+    args.add<std::string>("input", 'i', "输入视频或相机源，格式：-i (video|camera)[:value]", false, "cam:0");
     args.add<std::string>("size", 's', "设置视频源或是相机的输出尺寸", false, "640,480");
+
     args.add<std::string>("fn", '\0', "内存共享文件名称", false, "source.bin");
     args.add<uint32_t>("fs", '\0', "分配给共享内存的空间大小，默认为：(1920 x 1080 x 4)Bytes", false, (1920 * 1080 * 4));
     args.add<bool>("show", '\0', "是否显示视频窗口，用于调试", false, false);
@@ -35,40 +40,49 @@ int main(int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
-    if (SetConsoleCtrlHandler((PHANDLER_ROUTINE)CloseHandlerRoutine, TRUE) == FALSE)
-    {
-        std::cerr << "[ERROR] Unable to Install Close Handler Routine!" << std::endl;
-        return EXIT_FAILURE;
-    }
-
     cv::VideoCapture capture;
+
+#pragma region 解析input参数
     std::string input = args.get<std::string>("input");
-    if (input.find("cam:") == 0)
+    size_t start = 0;
+    size_t end = input.find(Delimiter);
+    std::string type = input.substr(start, end);
+
+    if (type == "cam" || type == "camera")
     {
-        //相机 Index
-        int index = std::stoi(input.substr(4).c_str());
+        //相机 默认索引 为 0
+        int index = (end == std::string::npos) ? 0 : std::stoi(input.substr(end + 1).c_str());
+
         capture.open(index);        
-        std::cout << "[ INFO] Setting Camera Index:" << index <<  std::endl;
+        LOG_INFO << "Source Camera Index:" << index <<  std::endl;
     }
-    else if (input.find("url:") == 0)
+    else if (type == "url" || type == "void")
     {
+        if (end == std::string::npos)
+        {
+            throw std::invalid_argument("未指定 VIDEO 源路径：" + input);
+            return EXIT_FAILURE;
+        }
+
         //视频 URL 地址
-        std::string url = input.substr(4);
+        std::string url = input.substr(end + 1);
         capture.open(url);
-        std::cout << "[ INFO] Setting Video URL:" << url << std::endl;
+        LOG_INFO << "Source Video URL:" << url << std::endl;
     }
     else
     {
-        std::cerr << "[ERROR] 参数输入错误：" + input + "， 示例：-i url:<path> OR -i cam:<index>" << std::endl;
+        LOG_ERROR << "input 参数输入错误：" + input + "， 示例：(video|camera)[:value]" << std::endl;
         return EXIT_FAILURE;
     }
+#pragma endregion
 
+#pragma region 解析size参数
     int w = 640, h = 480;
     try
     {
         //获取配置宽高信息
         std::string size = args.get<std::string>("size");
-        int c = size.find(',') > 0 ? size.find(',') : size.find('x') > 0 ? size.find('x') : -1;
+        int c = size.find(',') > 0 ? size.find(',') : size.find('x') > 0 ? size.find('x') : std::string::npos;
         if (c > 0)
         {
             w = std::stoi(size.substr(0, c));
@@ -77,16 +91,17 @@ int main(int argc, char **argv)
     }
     catch (std::exception & e)
     {
-        std::cerr << "[ERROR] " << e.what() << std::endl;
+        LOG_ERROR << e.what() << std::endl;
         return EXIT_FAILURE;
     }
     capture.set(cv::CAP_PROP_FRAME_WIDTH, w);
     capture.set(cv::CAP_PROP_FRAME_HEIGHT, h);
-    std::cout << "[ INFO] Setting Source Size:" << w << "," << h << std::endl;
+    LOG_INFO << "Setting Source Size:" << w << "," << h << std::endl;
+#pragma endregion
 
     if (!capture.isOpened())
     {
-        std::cerr << "[ERROR] 无法打开视频或相机源：" << input << std::endl;
+        LOG_ERROR << "无法打开视频或相机源：" << input << std::endl;
         return EXIT_FAILURE;
     }
 
@@ -96,7 +111,7 @@ int main(int argc, char **argv)
     int format = capture.get(cv::CAP_PROP_FORMAT);
     int fps = capture.get(cv::CAP_PROP_FPS);
 
-    std::cout << "[ INFO] Capture Size:" << width << "," << height << "  FPS:" << fps << "  Count:" << count << "  Format:" << format << std::endl;
+    LOG_INFO << "Capture Size:" << width << "," << height << "  FPS:" << fps << "  Count:" << count << "  Format:" << format << std::endl;
 
     cv::Mat srcFrame;
     VideoSourceData vsData;
@@ -126,7 +141,7 @@ int main(int argc, char **argv)
         {
             if (srcFrame.empty())
             {
-                std::cerr << "[ERROR] 读取到空帧，或视频播放结束" << std::endl;
+                LOG_ERROR << "读取到空帧，或视频播放结束" << std::endl;
                 break;
             }
         }

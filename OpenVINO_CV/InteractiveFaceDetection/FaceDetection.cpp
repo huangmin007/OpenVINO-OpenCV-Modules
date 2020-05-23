@@ -32,22 +32,54 @@
 
 int main(int argc, char **argv)
 {
-    LOG_INFO << "分析参数" << std::endl;
+    if (SetConsoleCtrlHandler((PHANDLER_ROUTINE)CloseHandlerRoutine, TRUE) == FALSE)
+    {
+        LOG("ERROR") << "Unable to Install Close Handler Routine!" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    LOG("INFO") << "参数解析 ... " << std::endl;
 #pragma region 参数设置
     cmdline::parser args;
-    CreateGeneralCmdLine(args, "InteractiveFaceDetection", "face-detection-adas-0001:FP16:CPU");
-    
-    args.add<uint8_t>("count", 'c', "最多可同时处理的面部数量", false, 16);
 
+    args.add("help", 'h', "参数说明");
+    args.add("info", 0, "Inference Engine Infomation");
+
+    args.add<std::string>("input", 'i', "输入源参数，格式：(video|camera|shared|socket)[:value[:value[:...]]]", false, "cam:0:640x480");
+    args.add<std::string>("output", 'o', "输出源参数，格式：(shared|console|socket)[:value[:value[:...]]]", false, "shared:face_output.bin");
+    args.add<std::string>("model", 'm', "用于 AI识别检测 的 网络模型名称/文件(.xml)和目标设备，格式：(AI模型名称)[:精度[:硬件]]，"
+        "示例：face-detection-adas-0001:FP16:CPU 或 face-detection-adas-0001:FP16:HETERO:CPU,GPU", false, "face-detection-adas-0001:FP16:CPU");
+    
     args.add<std::string>("m_em", 0, "用于<情绪识别检测>的网络模型文件(.xml)和目标设备，格式：(AI模型名称[:精度[:硬件]])", false, ""); //emotions-recognition-retail-0003:FP16:CPU
     args.add<std::string>("m_ag", 0, "用于<年龄/姓别检测>的网络模型文件(.xml)和目标设备，格式：(AI模型名称[:精度[:硬件]])", false, ""); //age-gender-recognition-retail-0013:FP16:CPU;
-    args.add<std::string>("m_hp", 0, "用于<头部姿态检测>的网络模型文件(.xml)和目标设备，格式：(AI模型名称[:精度[:硬件]])", false, "head-pose-estimation-adas-0001:FP16:CPU");
-    args.add<std::string>("m_lm", 0, "用于<人脸标记检测>的网络模型文件(.xml)和目标设备，格式：(AI模型名称[:精度[:硬件]])", false, "facial-landmarks-35-adas-0002:FP16:CPU");
+#ifdef _DEBUG
+    args.add<std::string>("m_hp", 0, "用于<头部姿态检测>的网络模型文件(.xml)和目标设备，格式：(AI模型名称[:精度[:硬件]])", false, "");
+    args.add<std::string>("m_lm", 0, "用于<人脸标记检测>的网络模型文件(.xml)和目标设备，格式：(AI模型名称[:精度[:硬件]])", false, "");
+
+    args.add<bool>("show", 0, "是否显示视频窗口，用于调试", false, true);
+#else
+    args.add<std::string>("m_hp", 0, "用于<头部姿态检测>的网络模型文件(.xml)和目标设备，格式：(AI模型名称[:精度[:硬件]])", false, "head-pose-estimation-adas-0001:FP16:GPU");
+    args.add<std::string>("m_lm", 0, "用于<人脸标记检测>的网络模型文件(.xml)和目标设备，格式：(AI模型名称[:精度[:硬件]])", false, "facial-landmarks-35-adas-0002:FP16:GPU");
+
+    args.add<bool>("show", 0, "是否显示视频窗口，用于调试", false, false);
+#endif
+    args.add<bool>("async", 0, "是否异步分析识别", false, true);
+    args.add<uint8_t>("count", 'c', "最多可同时处理的面部数量", false, 16);
+
+    args.set_program_name("InteractiveFaceDetection");      
+
+    
+    
 
     bool isParser = args.parse(argc, argv);
     if (args.exist("help"))
     {
         std::cerr << args.usage();
+        return EXIT_SUCCESS;
+    }
+    if (args.exist("info"))
+    {
+        InferenceEngineInfomation();
         return EXIT_SUCCESS;
     }
     if (!isParser)
@@ -56,17 +88,9 @@ int main(int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
-#pragma endregion
-
-    std::cout << "Hello World!\n";
-    if (SetConsoleCtrlHandler((PHANDLER_ROUTINE)CloseHandlerRoutine, TRUE) == FALSE)
-    {
-        LOG("ERROR") << "[ERROR] Unable to Install Close Handler Routine!" << std::endl;
-        return EXIT_FAILURE;
-    }
     // ---------------------------- 输入参数的解析和验证 --------------------------------------
     std::map<std::string, std::string> model = ParseArgsForModel(args.get<std::string>("model"));
-    if (model.size() != 4) throw std::invalid_argument("AI模型参数错误：" + args.get<std::string>("model"));
+    if (model["path"].empty()) throw std::invalid_argument("AI模型参数错误：" + args.get<std::string>("model"));
 
     std::map<std::string, std::string>  m_em = ParseArgsForModel(args.get<std::string>("m_em"));
     std::map<std::string, std::string> m_ag = ParseArgsForModel(args.get<std::string>("m_ag"));
@@ -74,10 +98,24 @@ int main(int argc, char **argv)
     std::map<std::string, std::string>  m_lm = ParseArgsForModel(args.get<std::string>("m_lm"));
 
     int count = args.get<uint8_t>("count");
-
-    bool pc = args.get<bool>("pc");         //是否启用每层性能报告
     bool show = args.get<bool>("show");     //是否显示渲染图像
     bool async = args.get<bool>("async");   //是否异步检测
+#pragma endregion
+
+
+     // -------- input args 不显示的参数
+    double fps = -1.f;
+    double dx_coef = 1.0;   //使边界框沿 x 轴围绕检测到的面部移动的系数
+    double dy_coef = 1.0;   //使边界框沿 y 轴围绕检测到的面部移动的系数
+    double bb_enlarge_coef_output_message = 1.2;    //放大/缩小检测到的面部周围的边框尺寸的系数
+    bool smooth = true;         //不平滑人物属性
+    bool raw_output_message = false;    //将推断结果输出为原始值
+    bool dyn_batch_message = false;  //为AI网络启用动态批量大小
+    bool show_emotion_bar = true;       //不显示情绪
+    std::string cldnn = "";         //GPU自定义内核所需。具有内核描述的.xml文件的绝对路径。
+    std::string cpu_library = "";   //CPU自定义层所需。使用内核实现的共享库的绝对路径。
+
+
 
     // --------------------------- 0. VideoCapture ------------------------------------------
     InputSource capture;    //cv::VideoCapture capture;    
@@ -94,19 +132,7 @@ int main(int argc, char **argv)
     }
     const int width = frame.cols;
     const int height = frame.rows;
-
-    // -------- input args
-    double fps = -1.f;
-    double dx_coef = 1.0;   //使边界框沿 x 轴围绕检测到的面部移动的系数
-    double dy_coef = 1.0;   //使边界框沿 y 轴围绕检测到的面部移动的系数
-    double bb_enlarge_coef_output_message = 1.2;    //放大/缩小检测到的面部周围的边框尺寸的系数
-    bool smooth = true;         //不平滑人物属性
-    bool raw_output_message = false;    //将推断结果输出为原始值
-    bool dyn_batch_message = false;  //为AI网络启用动态批量大小
-    bool show_emotion_bar = true;       //不显示情绪
-    std::string cldnn = "";         //GPU自定义内核所需。具有内核描述的.xml文件的绝对路径。
-    std::string cpu_library = "";   //CPU自定义层所需。使用内核实现的共享库的绝对路径。
-
+    const std::string title = "Detection Result [" + args.get<std::string>("model") + "]";
     
     // --------------------------- 1. 加载推理引擎实例 ------------------------------------------
     InferenceEngine::Core ie;
@@ -116,8 +142,6 @@ int main(int argc, char **argv)
     HeadPoseDetection headPoseDetector(m_hp["path"], m_hp["device"], count, dyn_batch_message, async, raw_output_message);
     EmotionsDetection emotionsDetector(m_em["path"], m_em["device"], count, dyn_batch_message, async, raw_output_message);
     FacialLandmarksDetection facialLandmarksDetector(m_lm["path"], m_lm["device"], count, dyn_batch_message, async, raw_output_message);
-
-    LOG("INFO") << "Loading device [" << model["device"] << "]" <<std::endl;
 
 #pragma region 自定义配置CPU&GPU
     std::set<std::string> loadedDevices;
@@ -157,9 +181,6 @@ int main(int argc, char **argv)
         loadedDevices.insert(deviceName);
     }
 #pragma endregion
-
-    if (pc)/** 每层指标 **/
-        ie.SetConfig({ {InferenceEngine::PluginConfigParams::KEY_PERF_COUNT, InferenceEngine::PluginConfigParams::YES} });
     
     // ------------ 2. 读取由 Model Optimizer 生成的 IR(Intermediate Representation)（.xml和.bin文件）
     faceDetector.net = ie.LoadNetwork(faceDetector.read(ie), model["device"], {});
@@ -193,7 +214,8 @@ int main(int argc, char **argv)
     if (show)
     {
         visualizer = std::make_shared<Visualizer>(cv::Size(width, height));
-        if (show_emotion_bar && emotionsDetector.enabled()) {
+        if (show_emotion_bar && emotionsDetector.enabled()) 
+        {
             visualizer->enableEmotionBar(emotionsDetector.emotionsVec);
         }
     }
@@ -206,17 +228,18 @@ int main(int argc, char **argv)
     prev_frame = frame.clone();    
     bool frameReadStatus = capture.read(frame, fid);
 
-    const cv::Point THROUGHPUT_METRIC_POSITION{ 10, 45 };
+    const cv::Point THROUGHPUT_METRIC_POSITION{ 10, 25 };
     cv::Size graphSize{ static_cast<int>(capture.get(cv::CAP_PROP_FRAME_WIDTH) / 4), 60 };
     Presenter presenter("", THROUGHPUT_METRIC_POSITION.y + 15, graphSize);
     
     Timer timer;
-    std::stringstream r_data;
+    std::stringstream x_data;
     while (true)
     {
         if (!IsRunning) break;
 
         timer.start("total");
+
         framesCounter++;
         bool isLastFrame = !frameReadStatus;
 
@@ -275,15 +298,15 @@ int main(int argc, char **argv)
             facialLandmarksDetector.wait();
         }
 
-        //  后期处理
-        std::list<Face::Ptr> prev_faces;
         faces.clear();
+        std::list<Face::Ptr> prev_faces;
 
-        r_data.str("");
-        r_data << "<data>" << std::endl;
-        r_data << "\t<fid>" << fid << "</fid>" << std::endl;
-        r_data << "\t<count>" << prev_detection_results.size() << "</count>" << std::endl;
-        r_data << "\t<faces>" << std::endl;
+#pragma region OutputSource
+        x_data.str("");
+        x_data << "<data>" << std::endl;
+        x_data << "\t<fid>" << fid << "</fid>" << std::endl;
+        x_data << "\t<count>" << prev_detection_results.size() << "</count>" << std::endl;
+        x_data << "\t<faces>" << std::endl;
         //处理检测到的每张脸
         for (size_t i = 0; i < prev_detection_results.size(); i++) 
         {
@@ -310,8 +333,8 @@ int main(int argc, char **argv)
                 face = std::make_shared<Face>(id++, rect);
             }
 
-            r_data << "\t<face label=\"" << result.label << "\" confidence=\"" << result.confidence << "\">" << std::endl;
-            r_data << "\t\t<location>" << result.location.x << "," << result.location.y << "," << result.location.width << "," << result.location.height << "</location>" << std::endl;
+            x_data << "\t\t<face label=\"" << result.label << "\" confidence=\"" << result.confidence << "\">" << std::endl;
+            x_data << "\t\t\t<location>" << result.location.x << "," << result.location.y << "," << result.location.width << "," << result.location.height << "</location>" << std::endl;
             
             face->ageGenderEnable((ageGenderDetector.enabled() && i < ageGenderDetector.maxBatch));
             if (face->isAgeGenderEnabled())
@@ -320,59 +343,64 @@ int main(int argc, char **argv)
                 face->updateGender(ageGenderResult.maleProb);
                 face->updateAge(ageGenderResult.age);
 
-                r_data << "\t\t<age>" << ageGenderResult.age << "</age>" << std::endl;
-                r_data << "\t\t<male>" << ageGenderResult.maleProb << "</male>" << std::endl;
+                x_data << "\t\t\t<age>" << ageGenderResult.age << "</age>" << std::endl;
+                x_data << "\t\t\t<male>" << ageGenderResult.maleProb << "</male>" << std::endl;
             }
 
             face->emotionsEnable((emotionsDetector.enabled() && i < emotionsDetector.maxBatch));
             if (face->isEmotionsEnabled())
             {
                 face->updateEmotions(emotionsDetector[i]);
-
-                r_data << "\t\t<emotions>" << std::endl;
+                x_data << "\t\t\t<emotions>" << std::endl;
                 for (auto& kv : emotionsDetector[i]) 
-                    r_data << "\t\t\t<emotion>" << kv.first << "," << kv.second << "</emotion>" << std::endl;
+                    x_data << "\t\t\t\t<emotion>" << kv.first << "," << kv.second << "</emotion>" << std::endl;
 
-                r_data << "\t\t</emotions>" << std::endl;
+                x_data << "\t\t\t</emotions>" << std::endl;
             }
             
             face->headPoseEnable((headPoseDetector.enabled() && i < headPoseDetector.maxBatch));
             if (face->isHeadPoseEnabled())
             {
                 face->updateHeadPose(headPoseDetector[i]);
-                r_data << "\t\t<pose o=\"ryp\">" << headPoseDetector[i].angle_r << "," << headPoseDetector[i].angle_y << "," << headPoseDetector[i].angle_p << "</pose>" << std::endl;
+                x_data << "\t\t\t<pose o=\"ryp\">" << headPoseDetector[i].angle_r << "," << headPoseDetector[i].angle_y << "," << headPoseDetector[i].angle_p << "</pose>" << std::endl;
             }
             
             face->landmarksEnable((facialLandmarksDetector.enabled() && i < facialLandmarksDetector.maxBatch));
             if (face->isLandmarksEnabled())
             {
                 face->updateLandmarks(facialLandmarksDetector[i]);
-                r_data << "\t\t<landmarks>" << std::endl;
+                x_data << "\t\t\t<landmarks>" << std::endl;
                 for(auto & value: facialLandmarksDetector[i])
-                    r_data << "\t\t\t<position>" << value << "</position>" << std::endl;
+                    x_data << "\t\t\t\t<position>" << value << "</position>" << std::endl;
 
-                r_data << "\t\t</landmarks>" << std::endl;
+                x_data << "\t\t\t</landmarks>" << std::endl;
             }
 
-            r_data << "\t</face>" << std::endl;
+            x_data << "\t\t</face>" << std::endl;
             faces.push_back(face);
         }
-        r_data << "\t</faces>" << std::endl;
-        r_data << "</data>\r\n";
-        output.write((uint8_t*)r_data.str().c_str(), r_data.str().size(), fid);
+        x_data << "\t</faces>" << std::endl;
+        x_data << "</data>\r\n";
 
-        presenter.drawGraphs(prev_frame);
+        output.set(SourceProperties::OUTPUT_FORMAT, (uint8_t)OutputFormat::XML);
+        output.write((uint8_t*)x_data.str().c_str(), x_data.str().size(), fid);
+#pragma endregion
 
         // 可视化结果
-        if (show) {
+        if (show) 
+        {
             out.str("");
-            out << "Total image throughput: " << std::fixed << std::setprecision(2) << 1000.f / (timer["total"].getSmoothedDuration()) << " fps";
-            cv::putText(prev_frame, out.str(), THROUGHPUT_METRIC_POSITION, cv::FONT_HERSHEY_TRIPLEX, 1, cv::Scalar(255, 0, 0), 2);
+            out << "Frame ID:" << fid << "  Total Use Time: " << 1000.f / timer["total"].getSmoothedDuration() << " fps";
+            cv::putText(prev_frame, out.str(), THROUGHPUT_METRIC_POSITION, cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 0, 0), 2);
 
             // drawing faces
+            presenter.drawGraphs(prev_frame);
             visualizer->draw(prev_frame, faces);
-            cv::imshow("Detection Results", prev_frame);
+            cv::imshow(title, prev_frame);
         }
+
+        if (!show || output.getType() != OutputType::CONSOLE)
+            std::cout << "\33[2K\r[ INFO] " << "Frame ID:" << fid << "    Total Use Time:" << timer["total"].getSmoothedDuration() << "ms";
 
         prev_frame = frame;
         frame = next_frame;
@@ -383,11 +411,7 @@ int main(int argc, char **argv)
         if (fps > 0)
             delay = std::max(1, static_cast<int>(msrate - timer["total"].getLastCallDuration()));
 
-        if (isLastFrame)
-        {
-
-        }
-        else if(show)
+        if(show)
         {
             int key = cv::waitKey(delay);
             if (27 == key || 'Q' == key || 'q' == key) {
@@ -397,23 +421,14 @@ int main(int argc, char **argv)
         }
     }
 
-
     LOG("INFO") << "Number of processed frames: " << framesCounter << std::endl;
     LOG("INFO") << "Total image throughput: " << framesCounter * (1000.f / timer["total"].getTotalDuration()) << " fps" << std::endl;
 
-    // 显示性能结果
-    if (pc) {
-        faceDetector.printPerformanceCounts(getFullDeviceName(ie, model["device"]));
-        ageGenderDetector.printPerformanceCounts(getFullDeviceName(ie, m_ag["device"]));
-        headPoseDetector.printPerformanceCounts(getFullDeviceName(ie, m_hp["device"]));
-        emotionsDetector.printPerformanceCounts(getFullDeviceName(ie, m_em["device"]));
-        facialLandmarksDetector.printPerformanceCounts(getFullDeviceName(ie, m_lm["device"]));
-    }
     std::cout << presenter.reportMeans() << '\n';
     // --------------------------- 8. 处理输出 --------------------------------------------------
 
     capture.release();
-    cv::destroyAllWindows();
+    if(show)    cv::destroyAllWindows();
 
     LOG("INFO") << "Exiting ..." << std::endl;
     Sleep(500);

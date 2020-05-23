@@ -9,7 +9,7 @@ InputSource::InputSource()
 }
 InputSource::~InputSource()
 {
-	release();
+	if(isopen)	release();
 }
 
 bool InputSource::isOpened() const{	return isopen;}
@@ -68,6 +68,17 @@ bool InputSource::set(int propId, double value)
 	return false;
 }
 
+void ParseArgForSize(const std::string &size, int& width, int& height)
+{
+	if (size.empty())return;
+
+	int index = size.find('x') != std::string::npos ? size.find('x') : size.find(',');
+	if (index == std::string::npos) return;
+
+	width = std::stoi(size.substr(0, index));
+	height = std::stoi(size.substr(index + 1));
+}
+
 bool InputSource::open(const std::string args)
 {
 	if (args.empty())
@@ -93,11 +104,35 @@ bool InputSource::open(const std::string args)
 	{
 		type = InputType::CAMERA;
 		//相机 默认索引 为 0
-		int index = (end == std::string::npos) ? 0 : std::stoi(args.substr(end + 1).c_str());
+		int index = 0, width = 640, height = 480;
+		//cam
+		if (end == std::string::npos)
+		{
+			isopen = capture.open(index);
+			capture.set(cv::CAP_PROP_FRAME_WIDTH, width);
+			capture.set(cv::CAP_PROP_FRAME_HEIGHT, height);
+
+			LOG("INFO") << "InputSource Camera: [Index:" << index << ", Size:" << width << "x" << height << "]" << std::endl;
+			return isopen;
+		}
+
+		start = end + 1;
+		end = args.find(Delimiter, end + 1);
+
+		//cam:index
+		if (end == std::string::npos) index = std::stoi(args.substr(start).c_str());
+		else //cam:index:size
+		{
+			index = std::stoi(args.substr(start, end - start).c_str());
+			ParseArgForSize(args.substr(end + 1), width, height);
+		}
 		
 		isopen = capture.open(index);
-		LOG("INFO") << "InputSource Camera: [Index:" << index << "]" << std::endl;
+		capture.set(cv::CAP_PROP_FRAME_WIDTH, width);
+		capture.set(cv::CAP_PROP_FRAME_HEIGHT, height);
 
+		LOG("INFO") << "InputSource Camera: [Index:" << index << ", Size:" << capture.get(cv::CAP_PROP_FRAME_WIDTH)
+			<< "x" << capture.get(cv::CAP_PROP_FRAME_HEIGHT) << "]" << std::endl;
 		return isopen;
 	}
 	else if (head == "url" || head == "video")
@@ -107,10 +142,28 @@ bool InputSource::open(const std::string args)
 		if (end == std::string::npos)
 			throw std::invalid_argument("未指定 VIDEO 源路径：" + args);
 
-		std::string url = args.substr(end + 1);
+		std::string url;
+		start = end + 1;
+		end = args.find(Delimiter, end + 1);
+		
+		int width = -1, height = -1;
+		//video:url
+		if(end == std::string::npos) url = args.substr(end + 1);
+		else //video:url:size
+		{
+			url = args.substr(start, end - start);
+			ParseArgForSize(args.substr(end + 1), width, height);
+		}
 
 		isopen = capture.open(url);
-		LOG("INFO") << "InputSource Video: [URL:" << url << "]" << std::endl;
+		if (width > 0 && height > 0)
+		{
+			capture.set(cv::CAP_PROP_FRAME_WIDTH, width);
+			capture.set(cv::CAP_PROP_FRAME_HEIGHT, height);
+		}
+
+		LOG("INFO") << "InputSource Video: [URL:" << url << ", Size:" << capture.get(cv::CAP_PROP_FRAME_WIDTH) 
+			<< "x" << capture.get(cv::CAP_PROP_FRAME_HEIGHT) << "]" << std::endl;
 
 		return isopen;
 	}

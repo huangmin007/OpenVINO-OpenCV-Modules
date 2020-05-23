@@ -74,7 +74,17 @@ public:
 	/// <param name="frame"></param>
 	/// <param name="length"></param>
 	/// <returns></returns>
-	bool write(const uint8_t *frame, const size_t length);
+	bool write(const uint8_t* frame, const size_t length);
+
+
+	/// <summary>
+	/// 从输出源中写入数据
+	/// </summary>
+	/// <param name="frame"></param>
+	/// <param name="data"></param>
+	/// <returns></returns>
+	//bool write(const uint8_t *frame, const OutputSourceData *data);
+
 
 	/// <summary>
 	/// 从输出源中写入数据

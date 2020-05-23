@@ -11,7 +11,7 @@ OutputSource::OutputSource()
 
 OutputSource::~OutputSource()
 {
-	release();
+	if (isopen)	release();
 }
 
 bool OutputSource::isOpened() const	{	return isopen;	}
@@ -39,8 +39,8 @@ bool OutputSource::set(int propId, double value)
 	{
 	case SourceProperties::FRAME_ID:	osd_data.fid = value;	return true;
 	case SourceProperties::MODULE_ID:	osd_data.mid = value;	return true;
+	case SourceProperties::OUTPUT_FORMAT:	osd_data.format = (OutputFormat)value;	return true;
 	case cv::CAP_PROP_FPS:				return true;
-	case cv::CAP_PROP_FORMAT:			osd_data.format = (OutputFormat)value;		return true;
 	case cv::CAP_PROP_FRAME_WIDTH:		return true;
 	case cv::CAP_PROP_FRAME_HEIGHT:		return true;
 	}
@@ -92,9 +92,6 @@ bool OutputSource::open(const std::string args)
 				sed_size = std::stoi(args.substr(end + 1));
 			}
 		}
-
-		std::cout << "sn::" << sed_name << std::endl;
-		std::cout << "ss::" << sed_size << std::endl;
 
 		if (!CreateOnlyWriteMapFile(pMapFile, pBuffer, sed_size, sed_name.c_str()))
 		{
@@ -160,7 +157,7 @@ bool OutputSource::write(const uint8_t* frame, const size_t length)
 
 	case OutputType::CONSOLE:
 		std::cout << "[" << console_head << "]" << std::endl;
-		std::cout << (void*)frame << std::endl;
+		std::cout << frame << std::endl;
 		break;
 	}
 
@@ -176,7 +173,7 @@ bool OutputSource::write(const uint8_t* frame, const size_t length, const size_t
 	}
 
 	osd_data.fid = frame_id;
-	return write(frame, length, frame_id);
+	return write(frame, length);
 }
 
 

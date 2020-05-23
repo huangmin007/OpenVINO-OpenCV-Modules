@@ -113,7 +113,7 @@ namespace human_pose_estimation
             executableNetwork = ie.LoadNetwork(network, targetDeviceName);
             requestNext = executableNetwork.CreateInferRequestPtr();
             requestCurr = executableNetwork.CreateInferRequestPtr();
-            std::cout << "Reshape needed" << std::endl;
+            //std::cout << "Reshape needed" << std::endl;
         }
     }
 
