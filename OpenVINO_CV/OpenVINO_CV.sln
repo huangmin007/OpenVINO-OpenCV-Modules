@@ -20,6 +20,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HumanPoseEstimation3D", "Hu
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "InteractiveFaceDetection", "InteractiveFaceDetection\InteractiveFaceDetection.vcxproj", "{84F798AE-10D7-43D4-8B47-8E2B825FAADE}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PersonDetection", "PersonDetection\PersonDetection.vcxproj", "{90F7BB57-60A4-474E-AC66-769974400A3F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -76,6 +78,14 @@ Global
 		{84F798AE-10D7-43D4-8B47-8E2B825FAADE}.Release|x64.Build.0 = Release|x64
 		{84F798AE-10D7-43D4-8B47-8E2B825FAADE}.Release|x86.ActiveCfg = Release|Win32
 		{84F798AE-10D7-43D4-8B47-8E2B825FAADE}.Release|x86.Build.0 = Release|Win32
+		{90F7BB57-60A4-474E-AC66-769974400A3F}.Debug|x64.ActiveCfg = Debug|x64
+		{90F7BB57-60A4-474E-AC66-769974400A3F}.Debug|x64.Build.0 = Debug|x64
+		{90F7BB57-60A4-474E-AC66-769974400A3F}.Debug|x86.ActiveCfg = Debug|Win32
+		{90F7BB57-60A4-474E-AC66-769974400A3F}.Debug|x86.Build.0 = Debug|Win32
+		{90F7BB57-60A4-474E-AC66-769974400A3F}.Release|x64.ActiveCfg = Release|x64
+		{90F7BB57-60A4-474E-AC66-769974400A3F}.Release|x64.Build.0 = Release|x64
+		{90F7BB57-60A4-474E-AC66-769974400A3F}.Release|x86.ActiveCfg = Release|Win32
+		{90F7BB57-60A4-474E-AC66-769974400A3F}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

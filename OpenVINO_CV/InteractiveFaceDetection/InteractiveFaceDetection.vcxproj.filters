@@ -24,7 +24,7 @@
     <ClCompile Include="visualizer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="FaceDetection.cpp">
+    <ClCompile Include="main.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

@@ -240,10 +240,10 @@ static bool ParseArgForSize(const std::string& size, int& width, int& height)
 
 /// <summary>
 /// 解析输入模型参数
-/// <para>输入格式为：(AI模型名称)[:精度[:硬件]]，示例：face-detection-adas-0001:FP16:CPU 或 face-detection-adas-0001:FP16:HETERO:CPU,GPU </para>
+/// <para>输入格式为：(AI模型名称)[:精度[:硬件]]，示例：face-detection-adas-0001:FP32:CPU 或 face-detection-adas-0001:FP16:GPU </para>
 /// </summary>
 /// <param name="args"></param>
-/// <returns>返回具有 ["model"/"name","fp","device","path"/"file"] 属性的 std::map 数据</returns>
+/// <returns>返回具有 ["model","fp","device","path"] 属性的 std::map 数据</returns>
 static const std::map<std::string, std::string> ParseArgsForModel(const std::string &args)
 {
     std::map<std::string, std::string> argMap

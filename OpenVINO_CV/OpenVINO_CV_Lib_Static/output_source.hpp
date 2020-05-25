@@ -123,4 +123,5 @@ private:
 	bool isopen = false;		//输出源是否已经打开
 	std::string console_head;	//控制台输出头信息
 	
+	//cv::VideoWriter writer;
 };

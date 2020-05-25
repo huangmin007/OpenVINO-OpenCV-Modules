@@ -159,12 +159,14 @@
     <ClInclude Include="input_source.hpp" />
     <ClInclude Include="io_data_format.hpp" />
     <ClInclude Include="log.h" />
+    <ClInclude Include="object_detectors.hpp" />
     <ClInclude Include="output_source.hpp" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="static_functions.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="input_source.cpp" />
+    <ClCompile Include="object_detectors.cpp" />
     <ClCompile Include="OpenVINO_CV_Lib_Static.cpp" />
     <ClCompile Include="output_source.cpp" />
     <ClCompile Include="pch.cpp">

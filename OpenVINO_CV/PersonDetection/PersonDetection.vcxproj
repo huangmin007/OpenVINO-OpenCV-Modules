@@ -21,10 +21,9 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{84f798ae-10d7-43d4-8b47-8e2b825faade}</ProjectGuid>
-    <RootNamespace>FaceDetector</RootNamespace>
+    <ProjectGuid>{90f7bb57-60a4-474e-ac66-769974400a3f}</ProjectGuid>
+    <RootNamespace>PersonDetection</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>InteractiveFaceDetection</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -146,15 +145,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="detectors.cpp" />
-    <ClCompile Include="face.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="visualizer.cpp" />
+    <ClCompile Include="person_detection.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="detectors.hpp" />
-    <ClInclude Include="face.hpp" />
-    <ClInclude Include="visualizer.hpp" />
+    <ClInclude Include="person_detection.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

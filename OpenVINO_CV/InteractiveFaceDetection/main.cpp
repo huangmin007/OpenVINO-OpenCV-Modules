@@ -45,10 +45,10 @@ int main(int argc, char **argv)
     args.add("help", 'h', "参数说明");
     args.add("info", 0, "Inference Engine Infomation");
 
-    args.add<std::string>("input", 'i', "输入源参数，格式：(video|camera|shared|socket)[:value[:value[:...]]]", false, "cam:0:640x480");
-    args.add<std::string>("output", 'o', "输出源参数，格式：(shared|console|socket)[:value[:value[:...]]]", false, "shared:face_output.bin");
+    args.add<std::string>("input", 'i', "输入源参数，格式：(video|camera|shared)[:value[:value[:...]]]", false, "camera:0:640x480");
+    args.add<std::string>("output", 'o', "输出源参数，格式：(shared|console|video)[:value[:value[:...]]]", false, "shared:face_output.bin");
     args.add<std::string>("model", 'm', "用于 AI识别检测 的 网络模型名称/文件(.xml)和目标设备，格式：(AI模型名称)[:精度[:硬件]]，"
-        "示例：face-detection-adas-0001:FP16:CPU 或 face-detection-adas-0001:FP16:HETERO:CPU,GPU", false, "face-detection-adas-0001:FP16:CPU");
+        "示例：face-detection-adas-0001:FP32:CPU 或 face-detection-adas-0001:FP16:GPU", false, "face-detection-adas-0001:FP32:CPU");
     
     args.add<std::string>("m_em", 0, "用于<情绪识别检测>的网络模型文件(.xml)和目标设备，格式：(AI模型名称[:精度[:硬件]])", false, ""); //emotions-recognition-retail-0003:FP16:CPU
     args.add<std::string>("m_ag", 0, "用于<年龄/姓别检测>的网络模型文件(.xml)和目标设备，格式：(AI模型名称[:精度[:硬件]])", false, ""); //age-gender-recognition-retail-0013:FP16:CPU;
@@ -69,8 +69,6 @@ int main(int argc, char **argv)
     args.set_program_name("InteractiveFaceDetection");      
 
     
-    
-
     bool isParser = args.parse(argc, argv);
     if (args.exist("help"))
     {
@@ -119,9 +117,20 @@ int main(int argc, char **argv)
 
     // --------------------------- 0. VideoCapture ------------------------------------------
     InputSource capture;    //cv::VideoCapture capture;    
-    capture.open(args.get<std::string>("input"));
+    if (!capture.open(args.get<std::string>("input")))
+    {
+        capture.release();
+        LOG_ERROR << "打开输入源失败 ... " << std::endl;
+        return EXIT_FAILURE;
+    }
     OutputSource output;
-    output.open(args.get<std::string>("output"));
+    if (!output.open(args.get<std::string>("output")))
+    {
+        output.release();
+        capture.release();
+        LOG_ERROR << "打开输出源失败 ... " << std::endl;
+        return EXIT_FAILURE;
+    }
 
     size_t fid = 0;
     cv::Mat frame, prev_frame, next_frame;

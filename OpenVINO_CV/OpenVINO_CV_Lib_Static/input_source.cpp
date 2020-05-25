@@ -86,7 +86,11 @@ bool InputSource::open(const std::string args)
 
 	std::vector<std::string> input = SplitString(args, ':');
 	size_t length = input.size();
-	if (length <= 0) throw std::logic_error("输入源参数错误：" + args);
+	if (length <= 0)
+	{
+		throw std::logic_error("输入源参数错误：" + args);
+		return false;
+	}
 
 	lastFrameID = 0;
 	vsd_data.fid = 0;
@@ -242,7 +246,7 @@ bool InputSource::release()
 		isopen = false;
 		if (pBuffer != NULL)	UnmapViewOfFile(pBuffer);	//撤消地址空间内的视图
 		if (pMapFile != NULL)	CloseHandle(pMapFile);		//关闭共享文件句柄
-		break;
+		return true;
 	}
 
 	return false;

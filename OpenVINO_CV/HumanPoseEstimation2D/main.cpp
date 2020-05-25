@@ -52,10 +52,10 @@ int main(int argc, char** argv)
     args.add("help", 'h', "参数说明");
     args.add("info", 0, "Inference Engine Infomation");
 
-    args.add<std::string>("input", 'i', "输入源参数，格式：(video|camera|shared|socket)[:value[:value[:...]]]", false, "cam:0");
-    args.add<std::string>("output", 'o', "输出源参数，格式：(shared|console|socket)[:value[:value[:...]]]", false, "shared:pose2d_output.bin");
+    args.add<std::string>("input", 'i', "输入源参数，格式：(video|camera|shared)[:value[:value[:...]]]", false, "cam:0");
+    args.add<std::string>("output", 'o', "输出源参数，格式：(shared|console|video)[:value[:value[:...]]]", false, "shared:pose2d_output.bin");
     args.add<std::string>("model", 'm', "用于 AI识别检测 的 网络模型名称/文件(.xml)和目标设备，格式：(AI模型名称)[:精度[:硬件]]，"
-        "示例：human-pose-estimation-0001:FP16:CPU 或 human-pose-estimation-0001:FP16:HETERO:CPU,GPU", false, "human-pose-estimation-0001:FP16:CPU");
+        "示例：human-pose-estimation-0001:FP32:CPU 或 human-pose-estimation-0001:FP16:GPU", false, "human-pose-estimation-0001:FP32:CPU");
     
     args.add<bool>("async", 0, "是否异步分析识别", false, true);
 #ifdef _DEBUG
@@ -109,9 +109,20 @@ int main(int argc, char** argv)
 
     //----------------- 第四步：创建 输入/输出 源 ----------------
     InputSource capture;
-    capture.open(args.get<std::string>("input"));
+    if (!capture.open(args.get<std::string>("input")))
+    {
+        capture.release();
+        LOG_ERROR << "打开输入源失败 ... " << std::endl;
+        return EXIT_FAILURE;
+    }
     OutputSource output;
-    output.open(args.get<std::string>("output"));
+    if (!output.open(args.get<std::string>("output")))
+    {
+        output.release();
+        capture.release();
+        LOG_ERROR << "打开输出源失败 ... " << std::endl;
+        return EXIT_FAILURE;
+    }
 
     //读取第一帧数据
     size_t fid = 0;

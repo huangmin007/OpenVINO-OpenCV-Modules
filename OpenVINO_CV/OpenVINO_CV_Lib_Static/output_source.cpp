@@ -65,11 +65,11 @@ bool OutputSource::open(const std::string args)
 
 	std::vector<std::string> output = SplitString(args, ':');
 	size_t length = output.size();
-	if (length <= 0) throw std::logic_error("输入源参数错误：" + args);
-
-	//size_t start = 0;
-	//size_t end = args.find(Delimiter);
-	//std::string head = args.substr(start, end);
+	if (length <= 0)
+	{
+		throw std::logic_error("输入源参数错误：" + args);
+		return false;
+	}
 
 	if (output[0] == "share" || output[0] == "shared")
 	{
@@ -108,12 +108,18 @@ bool OutputSource::open(const std::string args)
 
 		return isopen;
 	}
+	else if (output[0] == "video")
+	{
+		type = OutputType::VIDEO;
+		LOG_WARN << "暂未实现 VIDEO 输出源 ... " << std::endl;
+		return false;
+	}
 	else
 	{
-
+		return false;
 	}
 
-	return true;
+	return false;
 }
 
 
@@ -139,7 +145,11 @@ bool OutputSource::write(const uint8_t* frame, const size_t length)
 	case OutputType::CONSOLE:
 		std::cout << "[" << console_head << "]" << std::endl;
 		std::cout << frame << std::endl;
-		break;
+		return true;
+
+	case OutputType::VIDEO:
+		
+		return false;
 	}
 
 	return false;
