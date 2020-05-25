@@ -18,6 +18,17 @@
 #define LOG_WARN            LOG("WARN")
 #define LOG_ERROR           LOG("ERROR")
 
+void InferenceEngineInfomation();
+
+BOOL CloseHandlerRoutine(DWORD CtrlType);
+DWORD GetLastErrorFormatMessage(LPVOID& message);
+bool GetOnlyReadMapFile(HANDLE& handle, LPVOID& buffer, const char* name);
+bool CreateOnlyWriteMapFile(HANDLE& handle, LPVOID& buffer, uint32_t size, const char* name);
+
+bool ParseArgForSize(const std::string& size, int& width, int& height);
+const std::map<std::string, std::string> ParseArgsForModel(const std::string& args);
+const std::vector<std::string> SplitString(const std::string& src, const char delimiter);
+
 /// <summary>
 /// ms
 /// </summary>
@@ -207,26 +218,24 @@ static void CreateGeneralCmdLine(cmdline::parser & args, const std::string &prog
     args.set_program_name(program_name);
 }
 
-static const std::map<std::string, std::string> ParseArgsForInput(const std::string& args)
+/// <summary>
+/// 解析 Size 参数，格式：width(x|,)height
+/// </summary>
+/// <param name="size"></param>
+/// <param name="width"></param>
+/// <param name="height"></param>
+/// <returns></returns>
+static bool ParseArgForSize(const std::string& size, int& width, int& height)
 {
-    std::map<std::string, std::string> argMap;
-    argMap["type"] = "";
-    if (args.empty()) return argMap;
+    if (size.empty())return false;
 
-    size_t start = 0;
-    size_t end = args.find(Delimiter);
-    std::string head = args.substr(start, end);
+    int index = size.find('x') != std::string::npos ? size.find('x') : size.find(',');
+    if (index == std::string::npos) return false;
 
-    if (head == "cam" || head == "camera")
-    {
-        argMap["type"] = "camera";
-        argMap["index"] = "0";
-        argMap["size"] = "640x480";
-        if (end == std::string::npos)
-        {
-        }
-    }
+    width = std::stoi(size.substr(0, index));
+    height = std::stoi(size.substr(index + 1));
 
+    return true;
 }
 
 /// <summary>
@@ -237,56 +246,28 @@ static const std::map<std::string, std::string> ParseArgsForInput(const std::str
 /// <returns>返回具有 ["model"/"name","fp","device","path"/"file"] 属性的 std::map 数据</returns>
 static const std::map<std::string, std::string> ParseArgsForModel(const std::string &args)
 {
-    std::stringstream path;
-    std::map<std::string, std::string> argMap;
-    argMap["fp"] = "";
-    argMap["path"] = "";
-    argMap["model"] = "";
-    argMap["device"] = "CPU";
+    std::map<std::string, std::string> argMap
+    {
+        {"path", ""},
+        {"model", ""},
+        {"fp", "FP16"},
+        {"device", "CPU"}
+    };
 
-    if (args.empty() || args.length() == 0)   return argMap;
+    std::vector<std::string> model = SplitString(args, ':');
+    size_t length = model.size();
+    if (length <= 0) return argMap;
 
     //model
-    size_t start = 0, end = args.find(Delimiter);
-    if (end == std::string::npos)
-    {
-        argMap["fp"] = "FP16";
-        argMap["device"] = "CPU";
-        argMap["model"] = args.substr(start);
+    if (length >= 1)    argMap["model"] = model[0];
+    //model[:FP]
+    if (length >= 2)    argMap["fp"] = model[1];
+    //model[:FP[:device]]
+    if (length >= 3)    argMap["device"] = model[2];
+    //model[:fp[:device(HETERO:CPU,GPU)]]
+    if(length >= 4)     argMap["device"] = model[2] + ":" + model[3];
 
-        path << "models\\" << argMap["model"] << "\\" << argMap["fp"] << "\\" << argMap["model"] << ".xml";
-        argMap["path"] = path.str();
-        return argMap;
-    }
-
-    //model:fp
-    argMap["model"] = args.substr(start, end - start);
-    start = end + 1;
-    end = args.find(Delimiter, start);
-    if (end == std::string::npos)
-    {
-        argMap["fp"] = args.substr(start);
-        if (argMap["fp"].length() < 4) argMap["fp"] = "FP16";
-
-        argMap["device"] = "CPU";
-
-        path << "models\\" << argMap["model"] << "\\" << argMap["fp"] << "\\" << argMap["model"] << ".xml";
-        argMap["path"] = path.str();
-        return argMap;
-    }
-    
-    //model:fp:device
-    argMap["fp"] = args.substr(start, end - start);
-    if (argMap["fp"].length() < 4) argMap["fp"] = "FP16";
-
-    start = end + 1;
-    end = args.find(Delimiter, start);
-
-    argMap["device"] = args.substr(start);
-    if (argMap["device"].length() < 3) argMap["device"] = "CPU";
-
-    path << "models\\" << argMap["model"] << "\\" << argMap["fp"] << "\\" << argMap["model"] << ".xml";
-    argMap["path"] = path.str();
+    argMap["path"] = "models\\" + argMap["model"] + "\\" + argMap["fp"] + "\\" + argMap["model"] + ".xml";
 
     return argMap;
 }

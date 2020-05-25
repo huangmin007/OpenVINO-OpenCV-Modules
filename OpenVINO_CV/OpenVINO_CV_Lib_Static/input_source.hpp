@@ -25,10 +25,9 @@ enum SourceProperties : uint16_t
 /// </summary>
 enum class InputType:uint8_t
 {
-	CAMERA,		//相机源
 	VIDEO,		//视频源，默认为循环播放
+	CAMERA,		//相机源
 	SHARED,		//共享内存源
-	SOCKET,		//Socket源，用于静态图片路径传输，暂不支持
 };
 
 

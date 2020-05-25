@@ -18,14 +18,16 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
+#pragma region 设置解析参数
     cmdline::parser args;
     args.add<std::string>("help", 'h', "参数说明", false, "");
-    args.add<std::string>("input", 'i', "输入视频或相机源，格式：-i (video|camera)[:value]", false, "cam:0");
-    args.add<std::string>("size", 's', "设置视频源或是相机的输出尺寸", false, "640,480");
-
-    args.add<std::string>("fn", '\0', "内存共享文件名称", false, "source.bin");
-    args.add<uint32_t>("fs", '\0', "分配给共享内存的空间大小，默认为：(1920 x 1080 x 4)Bytes", false, (1920 * 1080 * 4));
+    args.add<std::string>("input", 'i', "输入视频或相机源，格式：-i (video|camera)[:value[:size]]", false, "cam:0:640x480");
+    args.add<std::string>("output", 'o', "输出内存共享源，格式：-o (shared)[:name[:size]]", false, "shared:source.bin:8294400");
+#ifdef _DEBUG
+    args.add<bool>("show", '\0', "是否显示视频窗口，用于调试", false, true);
+#else
     args.add<bool>("show", '\0', "是否显示视频窗口，用于调试", false, false);
+#endif
     args.set_program_name("VideoSourceShared");
 
     bool isParser = args.parse(argc, argv);    
@@ -40,63 +42,63 @@ int main(int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
+    bool isShow = args.get<bool>("show");
+    std::string input = args.get<std::string>("input");
+    std::string output = args.get<std::string>("output");
+#pragma endregion
+
     cv::VideoCapture capture;
 
 #pragma region 解析input参数
-    std::string input = args.get<std::string>("input");
-    size_t start = 0;
-    size_t end = input.find(Delimiter);
-    std::string type = input.substr(start, end);
-
-    if (type == "cam" || type == "camera")
+    std::vector<std::string> inputArr = SplitString(input, ':');
+    size_t length = inputArr.size();
+    if (length <= 0) throw std::logic_error("输入参数错误：" + input);
+    
+    if (inputArr[0] == "cam" || inputArr[0] == "camera")
     {
-        //相机 默认索引 为 0
-        int index = (end == std::string::npos) ? 0 : std::stoi(input.substr(end + 1).c_str());
+        //相机的默认参数
+        int index = 0, width = 640, height = 480;
+        if (length >= 2)    index = std::stoi(inputArr[1]);
+        if (length >= 3)    ParseArgForSize(inputArr[2], width, height);
+        
+        capture.open(index);
+        capture.set(cv::CAP_PROP_FRAME_WIDTH, width);
+        capture.set(cv::CAP_PROP_FRAME_HEIGHT, height);
 
-        capture.open(index);        
-        LOG_INFO << "Source Camera Index:" << index <<  std::endl;
+        LOG_INFO << "Input Source Camera [Index:" << index << ", Size:" 
+            << capture.get(cv::CAP_PROP_FRAME_WIDTH) << "x"
+            << capture.get(cv::CAP_PROP_FRAME_HEIGHT) 
+            << "]" << std::endl;
     }
-    else if (type == "url" || type == "void")
+    else if (inputArr[0] == "url" || inputArr[0] == "void")
     {
-        if (end == std::string::npos)
+        if (length == 1)
         {
             throw std::invalid_argument("未指定 VIDEO 源路径：" + input);
             return EXIT_FAILURE;
         }
 
-        //视频 URL 地址
-        std::string url = input.substr(end + 1);
-        capture.open(url);
-        LOG_INFO << "Source Video URL:" << url << std::endl;
+        capture.open(inputArr[1]);
+        if (length >= 3)
+        {
+            int width = 640, height = 480;
+            if (ParseArgForSize(inputArr[2], width, height))
+            {
+                capture.set(cv::CAP_PROP_FRAME_WIDTH, width);
+                capture.set(cv::CAP_PROP_FRAME_HEIGHT, height);
+            }
+        }
+
+        LOG_INFO << "Input Source Video [Index:" << inputArr[1] << ", Size:"
+            << capture.get(cv::CAP_PROP_FRAME_WIDTH) << "x"
+            << capture.get(cv::CAP_PROP_FRAME_HEIGHT)
+            << "]" << std::endl;
     }
     else
     {
-        LOG_ERROR << "input 参数输入错误：" + input + "， 示例：(video|camera)[:value]" << std::endl;
+        LOG_ERROR << "input 参数不支持，输入错误：" + input + "， 格式：-i (video|camera)[:value[:size]]" << std::endl;
         return EXIT_FAILURE;
     }
-#pragma endregion
-
-#pragma region 解析size参数
-    int w = 640, h = 480;
-    try
-    {
-        //获取配置宽高信息
-        std::string size = args.get<std::string>("size");
-        int c = size.find(',') > 0 ? size.find(',') : size.find('x') > 0 ? size.find('x') : std::string::npos;
-        if (c > 0)
-        {
-            w = std::stoi(size.substr(0, c));
-            h = std::stoi(size.substr(c + 1));
-        }
-    }
-    catch (std::exception & e)
-    {
-        LOG_ERROR << e.what() << std::endl;
-        return EXIT_FAILURE;
-    }
-    capture.set(cv::CAP_PROP_FRAME_WIDTH, w);
-    capture.set(cv::CAP_PROP_FRAME_HEIGHT, h);
-    LOG_INFO << "Setting Source Size:" << w << "," << h << std::endl;
 #pragma endregion
 
     if (!capture.isOpened())
@@ -105,30 +107,51 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
+#pragma region 解析output参数
+    std::vector<std::string> outputArr = SplitString(output, ':');
+    length = outputArr.size();
+    if (length <= 0) throw std::logic_error("输出参数错误：" + output);
+
+    size_t shared_size = 1920 * 1080 * 4;
+    std::string shared_name = "source.bin";
+
+    if (outputArr[0] == "share" || outputArr[0] == "shared")
+    {
+        if (length >= 2)
+            shared_name = outputArr[1];
+        if (length >= 3)
+            shared_size = std::stoi(outputArr[2]);
+    }
+    else
+    {
+        LOG_ERROR << "output 参数不支持，输入错误：" + output + "， 格式：-o (shared)[:name[:size]]" << std::endl;
+        return EXIT_FAILURE;
+    }
+    LOG_INFO << "Output Source Shared [Name:" << shared_name << ", Size:" << shared_size << "]" << std::endl;
+#pragma endregion      
+
+    LPVOID srcBuffer = NULL;
+    HANDLE srcMapFile = NULL;    
+    if (!CreateOnlyWriteMapFile(srcMapFile, srcBuffer, shared_size + VSD_SIZE, shared_name.c_str()))
+    {
+        LOG_ERROR << "创建共享内存失败" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    cv::Mat srcFrame;
+    VideoSourceData vsData;
+
     int width = capture.get(cv::CAP_PROP_FRAME_WIDTH);
     int height = capture.get(cv::CAP_PROP_FRAME_HEIGHT);
     int count = capture.get(cv::CAP_PROP_FRAME_COUNT);
     int format = capture.get(cv::CAP_PROP_FORMAT);
     int fps = capture.get(cv::CAP_PROP_FPS);
+    std::string title = "Video Source [" + input + "]";
 
     LOG_INFO << "Capture Size:" << width << "," << height << "  FPS:" << fps << "  Count:" << count << "  Format:" << format << std::endl;
 
-    cv::Mat srcFrame;
-    VideoSourceData vsData;
-    static int vsdSize = sizeof(VideoSourceData);
-
-    LPVOID srcBuffer = NULL;
-    HANDLE srcMapFile = NULL;    
-    if (!CreateOnlyWriteMapFile(srcMapFile, srcBuffer, args.get<uint32_t>("fs") + vsdSize,
-        args.get<std::string>("fn").c_str()))
-    {
-        std::cerr << "[ERROR] 创建共享内存失败" << std::endl;
-        return EXIT_FAILURE;
-    }
-
     double use_time = 0.0;
     int waitDelay = WaitKeyDelay;
-    bool isShow = args.get<bool>("show");
     auto t0 = std::chrono::high_resolution_clock::now();
     auto t1 = std::chrono::high_resolution_clock::now();
 
@@ -146,11 +169,13 @@ int main(int argc, char **argv)
             }
         }
 
+        fps = capture.get(cv::CAP_PROP_FPS);
+
         //写入到共享内存
         vsData.fid += 1;
         vsData.copy(srcFrame);
-        std::copy((uint8_t*)&vsData, (uint8_t*)&vsData + vsdSize, (uint8_t*)srcBuffer);
-        std::copy((uint8_t*)srcFrame.data, (uint8_t*)srcFrame.data + vsData.length, (uint8_t*)srcBuffer + vsdSize);
+        std::copy((uint8_t*)&vsData, (uint8_t*)&vsData + VSD_SIZE, (uint8_t*)srcBuffer);
+        std::copy((uint8_t*)srcFrame.data, (uint8_t*)srcFrame.data + vsData.length, (uint8_t*)srcBuffer + VSD_SIZE);
 
         t1 = std::chrono::high_resolution_clock::now();
         use_time = std::chrono::duration_cast<ms>(t1 - t0).count();
@@ -158,10 +183,10 @@ int main(int argc, char **argv)
         waitDelay = WaitKeyDelay - use_time;
         waitDelay = waitDelay <= 0 ? 1 : waitDelay;
 
-        std::cout << "\33[K\r[ INFO] " << "Current FrameID:" << vsData.fid << "  Read/Write Use:" << use_time << "ms";
+        std::cout << "\33[K\r[ INFO] " << "Current FPS:" << fps << "  FrameID:" << vsData.fid << "  Read/Write Use:" << use_time << "ms";
 
         cv::waitKey(waitDelay);
-        if (isShow) cv::imshow("Video Source", srcFrame);
+        if (isShow) cv::imshow(title, srcFrame);
     }
     std::cout << std::endl;
 
@@ -173,7 +198,7 @@ int main(int argc, char **argv)
     //关闭共享文件句柄
     if (srcMapFile != NULL)  CloseHandle(srcMapFile);
 
-    std::cout << "[ INFO] Exiting ..." << std::endl;
+    LOG_INFO << "Exiting ..." << std::endl;
     Sleep(500);
 
     return EXIT_SUCCESS;

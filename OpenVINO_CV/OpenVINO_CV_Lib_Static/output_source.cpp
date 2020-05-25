@@ -61,37 +61,27 @@ bool OutputSource::open(const std::string args)
 		LOG_WARN << "输入源已打开 ... " << std::endl;
 		return false;
 	}
+	LOG("INFO") << "Parsing Output Source: [" << args << "]" << std::endl;
 
-	LOG("INFO") << "OutputSource Open: [" << args << "]" << std::endl;
+	std::vector<std::string> output = SplitString(args, ':');
+	size_t length = output.size();
+	if (length <= 0) throw std::logic_error("输入源参数错误：" + args);
 
-	size_t start = 0;
-	size_t end = args.find(Delimiter);
-	std::string head = args.substr(start, end);
+	//size_t start = 0;
+	//size_t end = args.find(Delimiter);
+	//std::string head = args.substr(start, end);
 
-	if (head == "share" || head == "shared")
+	if (output[0] == "share" || output[0] == "shared")
 	{
 		type = OutputType::SHARED;
-		if (end == std::string::npos)
-		{
-			sed_name = SHARED_OUTPUT_SOURCE_NAME;
-			sed_size = SHARED_OUTPUT_SOURCE_SIZE;
-		}
-		else
-		{
-			start = end + 1;
-			end = args.find(Delimiter, end + 1);
 
-			if (end == std::string::npos)
-			{
-				sed_name = args.substr(start);
-				sed_size = SHARED_OUTPUT_SOURCE_SIZE;
-			}
-			else
-			{
-				sed_name = args.substr(start, end - start);
-				sed_size = std::stoi(args.substr(end + 1));
-			}
-		}
+		//shared
+		sed_name = SHARED_OUTPUT_SOURCE_NAME;
+		sed_size = SHARED_OUTPUT_SOURCE_SIZE;
+		//shared[:name]
+		if (length >= 2)		sed_name = output[1];
+		//shared[:name[:size]]
+		if (length >= 3)		sed_size = std::stoi(output[2]);
 
 		if (!CreateOnlyWriteMapFile(pMapFile, pBuffer, sed_size, sed_name.c_str()))
 		{
@@ -101,26 +91,20 @@ bool OutputSource::open(const std::string args)
 		}
 
 		isopen = true;
-		LOG("INFO") << "OutputSource Shared: [Name:" << sed_name << "    Size:" << sed_size << " Bytes]" << std::endl;
+		LOG("INFO") << "Output Source Shared: [Name:" << sed_name << "    Size:" << sed_size << " Bytes]" << std::endl;
 		return isopen;
 	}
-	else if (head == "console")
+	else if (output[0] == "console")
 	{
 		isopen = true;
 		type = OutputType::CONSOLE;
 
-		console_head = (end == std::string::npos) ? CONSOLE_OUTPUT_SOURCE_HEAD : args.substr(end + 1);
+		//console
+		console_head = CONSOLE_OUTPUT_SOURCE_HEAD;
+		//console[:head]
+		if (length >= 2)	console_head = output[1];
+
 		LOG("INFO") << "OutputSource Console: [Head:" << console_head << "]" << std::endl;
-
-		return isopen;
-	}
-	else if (head == "sock" || head == "socket")
-	{
-		isopen = false;
-		type = OutputType::SOCKET;
-
-		LOG_WARN << "暂时未完成对 SOCKET 的支持：" << args << std::endl;
-		throw std::invalid_argument("暂时未完成对 SOCKET 的支持：" + args);
 
 		return isopen;
 	}
@@ -152,9 +136,6 @@ bool OutputSource::write(const uint8_t* frame, const size_t length)
 		std::copy(frame, frame + length, (uint8_t*)pBuffer + OSD_SIZE);
 		return true;
 		
-	case OutputType::SOCKET:
-		break;
-
 	case OutputType::CONSOLE:
 		std::cout << "[" << console_head << "]" << std::endl;
 		std::cout << frame << std::endl;
@@ -191,10 +172,6 @@ bool OutputSource::release()
 			isopen = false;
 			if (pBuffer != NULL)	UnmapViewOfFile(pBuffer);	//撤消地址空间内的视图
 			if (pMapFile != NULL)	CloseHandle(pMapFile);		//关闭共享文件句柄
-			return true;
-
-		case OutputType::SOCKET:
-			isopen = false;
 			return true;
 
 		case OutputType::CONSOLE:

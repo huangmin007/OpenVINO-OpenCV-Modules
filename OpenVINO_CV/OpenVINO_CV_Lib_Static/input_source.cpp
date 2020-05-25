@@ -68,16 +68,7 @@ bool InputSource::set(int propId, double value)
 	return false;
 }
 
-void ParseArgForSize(const std::string &size, int& width, int& height)
-{
-	if (size.empty())return;
 
-	int index = size.find('x') != std::string::npos ? size.find('x') : size.find(',');
-	if (index == std::string::npos) return;
-
-	width = std::stoi(size.substr(0, index));
-	height = std::stoi(size.substr(index + 1));
-}
 
 bool InputSource::open(const std::string args)
 {
@@ -91,89 +82,71 @@ bool InputSource::open(const std::string args)
 		LOG_WARN << "输入源已打开 ... " << std::endl;
 		return false;
 	}
+	LOG("INFO") << "Parsing Input Source: [" << args << "]" << std::endl;
+
+	std::vector<std::string> input = SplitString(args, ':');
+	size_t length = input.size();
+	if (length <= 0) throw std::logic_error("输入源参数错误：" + args);
 
 	lastFrameID = 0;
 	vsd_data.fid = 0;
-	LOG("INFO") << "InputSource Open: [" << args << "]" << std::endl;
 
-	size_t start = 0;
-	size_t end = args.find(Delimiter);
-	std::string head = args.substr(start, end);
-
-	if (head == "cam" || head == "camera")
+	if (input[0] == "cam" || input[0] == "camera")
 	{
 		type = InputType::CAMERA;
-		//相机 默认索引 为 0
+
+		//camera
 		int index = 0, width = 640, height = 480;
-		//cam
-		if (end == std::string::npos)
-		{
-			isopen = capture.open(index);
-			capture.set(cv::CAP_PROP_FRAME_WIDTH, width);
-			capture.set(cv::CAP_PROP_FRAME_HEIGHT, height);
-
-			LOG("INFO") << "InputSource Camera: [Index:" << index << ", Size:" << width << "x" << height << "]" << std::endl;
-			return isopen;
-		}
-
-		start = end + 1;
-		end = args.find(Delimiter, end + 1);
-
-		//cam:index
-		if (end == std::string::npos) index = std::stoi(args.substr(start).c_str());
-		else //cam:index:size
-		{
-			index = std::stoi(args.substr(start, end - start).c_str());
-			ParseArgForSize(args.substr(end + 1), width, height);
-		}
+		//camera[:index]
+		if (length >= 2)    index = std::stoi(input[1]);
+		//camera[:index[:size]]
+		if (length >= 3)    ParseArgForSize(input[2], width, height);
 		
 		isopen = capture.open(index);
 		capture.set(cv::CAP_PROP_FRAME_WIDTH, width);
 		capture.set(cv::CAP_PROP_FRAME_HEIGHT, height);
 
-		LOG("INFO") << "InputSource Camera: [Index:" << index << ", Size:" << capture.get(cv::CAP_PROP_FRAME_WIDTH)
+		LOG("INFO") << "Input Source Camera: [Index:" << index << ", Size:" << capture.get(cv::CAP_PROP_FRAME_WIDTH)
 			<< "x" << capture.get(cv::CAP_PROP_FRAME_HEIGHT) << "]" << std::endl;
 		return isopen;
 	}
-	else if (head == "url" || head == "video")
+	else if (input[0] == "url" || input[0] == "video")
 	{
 		type = InputType::VIDEO;
 		//Video 没有默认参数
-		if (end == std::string::npos)
+		if (length == 1)
+		{
 			throw std::invalid_argument("未指定 VIDEO 源路径：" + args);
-
-		std::string url;
-		start = end + 1;
-		end = args.find(Delimiter, end + 1);
-		
-		int width = -1, height = -1;
-		//video:url
-		if(end == std::string::npos) url = args.substr(end + 1);
-		else //video:url:size
-		{
-			url = args.substr(start, end - start);
-			ParseArgForSize(args.substr(end + 1), width, height);
+			return false;
 		}
 
-		isopen = capture.open(url);
-		if (width > 0 && height > 0)
+		//video(:url)
+		capture.open(input[1]);
+		//video(:url[:size])
+		if (length >= 3)
 		{
-			capture.set(cv::CAP_PROP_FRAME_WIDTH, width);
-			capture.set(cv::CAP_PROP_FRAME_HEIGHT, height);
+			int width = 640, height = 480;
+			if (ParseArgForSize(input[2], width, height))
+			{
+				capture.set(cv::CAP_PROP_FRAME_WIDTH, width);
+				capture.set(cv::CAP_PROP_FRAME_HEIGHT, height);
+			}
 		}
 
-		LOG("INFO") << "InputSource Video: [URL:" << url << ", Size:" << capture.get(cv::CAP_PROP_FRAME_WIDTH) 
+		LOG("INFO") << "Input Source Video: [URL:" << input[1] << ", Size:" << capture.get(cv::CAP_PROP_FRAME_WIDTH)
 			<< "x" << capture.get(cv::CAP_PROP_FRAME_HEIGHT) << "]" << std::endl;
 
 		return isopen;
 	}
-	else if (head == "share" || head == "shared")
+	else if (input[0] == "share" || input[0] == "shared")
 	{
 		type = InputType::SHARED;
-		//内存共享源名称 有默认值 为 "source.bin"
-		shared_name = (end == std::string::npos) ? SHARED_INPUT_SOURCE_NAME : args.substr(end + 1);
 
-		//===== 这里要不要设计一个持续等待过程？？？？
+		//shared
+		std::string shared_name = SHARED_INPUT_SOURCE_NAME;
+		//shared[:name]
+		if (length >= 2) shared_name = input[1];
+
 		if (!GetOnlyReadMapFile(pMapFile, pBuffer, shared_name.c_str()))
 		{
 			pMapFile = NULL, pBuffer = NULL;
@@ -184,14 +157,13 @@ bool InputSource::open(const std::string args)
 		isopen = true;
 		//读取帧头部数据
 		std::copy((uint8_t*)pBuffer, (uint8_t*)pBuffer + VSD_SIZE, (uint8_t*)&vsd_data);
-		LOG("INFO") << "InputSource Shared: [Name:" << shared_name << "]" << std::endl;
+		LOG("INFO") << "Input Source Shared: [Name:" << shared_name << "]" << std::endl;
 
 		return isopen;
 	}
-	else if (head == "sock" || head == "socket")
+	else if (input[0] == "sock" || input[0] == "socket")
 	{
 		isopen = false;
-		type = InputType::SOCKET;
 
 		LOG_WARN << "暂时未完成对 SOCKET 的支持：" << args << std::endl;
 		throw std::invalid_argument("暂时未完成对 SOCKET 的支持：" + args);
@@ -228,15 +200,12 @@ bool InputSource::read(cv::Mat& frame)
 			if (frame.empty())
 				frame.create(vsd_data.height, vsd_data.width, vsd_data.type);
 			
-			if(lastFrameID != vsd_data.fid)
-				std::copy((uint8_t*)pBuffer + VSD_SIZE, (uint8_t*)pBuffer + VSD_SIZE + vsd_data.length, frame.data);
-			
-			lastFrameID = vsd_data.fid;
-			return true;
+			//同一帧数据，返回false
+			if (lastFrameID == vsd_data.fid) return false;
 
-		case InputType::SOCKET:
-			return false;
-			break;
+			lastFrameID = vsd_data.fid;
+			std::copy((uint8_t*)pBuffer + VSD_SIZE, (uint8_t*)pBuffer + VSD_SIZE + vsd_data.length, frame.data);
+			return true;
 	}
 
 	return false;
@@ -273,10 +242,6 @@ bool InputSource::release()
 		isopen = false;
 		if (pBuffer != NULL)	UnmapViewOfFile(pBuffer);	//撤消地址空间内的视图
 		if (pMapFile != NULL)	CloseHandle(pMapFile);		//关闭共享文件句柄
-		break;
-
-	case InputType::SOCKET:
-		isopen = false;
 		break;
 	}
 

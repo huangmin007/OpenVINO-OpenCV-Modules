@@ -18,8 +18,8 @@
 /// </summary>
 enum class OutputType :uint8_t
 {
+	VIDEO,			//输出视频
 	SHARED,			//内存共享类型
-	SOCKET,			//Socket 类型，暂不支持
 	CONSOLE,		//控制台输出类型
 };
 

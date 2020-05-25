@@ -427,7 +427,9 @@ int main(int argc, char **argv)
     std::cout << presenter.reportMeans() << '\n';
     // --------------------------- 8. 处理输出 --------------------------------------------------
 
+    output.release();
     capture.release();
+
     if(show)    cv::destroyAllWindows();
 
     LOG("INFO") << "Exiting ..." << std::endl;

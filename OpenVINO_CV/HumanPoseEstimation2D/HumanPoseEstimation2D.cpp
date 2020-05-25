@@ -233,8 +233,9 @@ int main(int argc, char** argv)
     }
     std::cout << std::endl;
 
+    output.release(); 
     capture.release();
-    output.release();
+    
     if(show)    cv::destroyAllWindows();
 
     std::cout << "[ INFO] Exiting ..." << std::endl;
