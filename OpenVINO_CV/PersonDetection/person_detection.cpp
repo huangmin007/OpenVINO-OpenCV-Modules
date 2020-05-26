@@ -1,5 +1,5 @@
 #include "person_detection.hpp"
-#include "samples/ocv_common.hpp"
+//#include "samples/ocv_common.hpp"
 
 
 PersonDetection::PersonDetection(const std::string& model, const std::string& device, bool isAsync)
@@ -37,6 +37,78 @@ void PersonDetection::wait()
     //RESULT_READY， 一直等待，直到有推理结果出来。
     //STATUS_ONLY， 立即返回请求状态，它不会阻塞或中断当前线程。
     requestPtr->Wait(InferenceEngine::IInferRequest::WaitMode::RESULT_READY);
+}
+
+template <typename T>
+void matU8ToBlob(const cv::Mat& orig_image, InferenceEngine::Blob::Ptr& blob, int batchIndex = 0) 
+{
+    InferenceEngine::SizeVector blobSize = blob->getTensorDesc().getDims();
+    const size_t width = blobSize[3];
+    const size_t height = blobSize[2];
+    const size_t channels = blobSize[1];
+
+    if (static_cast<size_t>(orig_image.channels()) != channels) 
+        THROW_IE_EXCEPTION << "The number of channels for net input and image must match";
+    
+    T* blob_data = blob->buffer().as<T*>();
+
+    cv::Mat resized_image(orig_image);
+    if (static_cast<int>(width) != orig_image.size().width ||
+        static_cast<int>(height) != orig_image.size().height) {
+        cv::resize(orig_image, resized_image, cv::Size(width, height));
+    }
+
+    int batchOffset = batchIndex * width * height * channels;
+
+    if (channels == 1) {
+        for (size_t h = 0; h < height; h++) {
+            for (size_t w = 0; w < width; w++) {
+                blob_data[batchOffset + h * width + w] = resized_image.at<uchar>(h, w);
+            }
+        }
+    }
+    else if (channels == 3) 
+    {
+        auto t0 = std::chrono::high_resolution_clock::now();
+        /*
+        for (size_t c = 0; c < channels; c++) {
+            for (size_t h = 0; h < height; h++) {
+                for (size_t w = 0; w < width; w++) {
+                    blob_data[batchOffset + c * width * height + h * width + w] = resized_image.at<cv::Vec3b>(h, w)[c];
+                }
+            }
+        }
+        auto t1 = std::chrono::high_resolution_clock::now();
+        double t = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1, 1000>>>(t1 - t0).count();
+        std::cout << "duration:" << t << std::endl;
+        */
+        
+        for (int h = 0; h < height; h++)
+        {
+            //cv::Vec3b* row_pixels = resized_image.ptr<cv::Vec3b>(h);
+            T* row_pixels = resized_image.data + h * resized_image.step;
+            for (int w = 0; w < width; w++)
+            {
+                //cv::Vec3b bgr = row_pixels[w];
+                //blob_data[batchOffset + h * width + w] = row_pixels[w][0];// row_pixels[0];
+                //blob_data[batchOffset + (width * height * 1) + h * width + w] = row_pixels[w][1];// row_pixels[1];
+                //blob_data[batchOffset + (width * height * 2) + h * width + w] = row_pixels[w][2];// row_pixels[2];
+
+                blob_data[batchOffset + h * width + w] = row_pixels[0];
+                blob_data[batchOffset + (width * height * 1) + h * width + w] = row_pixels[1];
+                blob_data[batchOffset + (width * height * 2) + h * width + w] = row_pixels[2];
+
+                row_pixels += 3;
+            }
+        }
+        auto t1 = std::chrono::high_resolution_clock::now();
+        double t = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1, 1000>>>(t1 - t0).count();
+        std::cout << "duration:" << t << std::endl;
+        
+    }
+    else {
+        THROW_IE_EXCEPTION << "Unsupported number of channels";
+    }
 }
 
 void PersonDetection::enqueue(const cv::Mat& frame)

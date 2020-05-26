@@ -22,7 +22,7 @@ int main(int argc, char **argv)
     cv::Mat prev_frame, frame;
     InputSource inputSource;
     //if (!inputSource.open("video:video.mp4"))
-    if (!inputSource.open("camera:0:1920x1080"))
+    if (!inputSource.open("camera:0:640x480"))
     {
         inputSource.release();
         LOG_ERROR << "打开输入源失败 ... " << std::endl;
@@ -95,7 +95,6 @@ int main(int argc, char **argv)
         if (delay <= 0) delay = 1;
 
         cv::waitKey(delay);
-        
     }
 
     inputSource.release();
