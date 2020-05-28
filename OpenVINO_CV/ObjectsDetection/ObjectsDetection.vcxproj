@@ -22,8 +22,9 @@
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{90f7bb57-60a4-474e-ac66-769974400a3f}</ProjectGuid>
-    <RootNamespace>PersonDetection</RootNamespace>
+    <RootNamespace>ObjectsDetection</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>ObjectsDetection</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -146,10 +147,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="person_detection.cpp" />
+    <ClCompile Include="object_detection.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="person_detection.hpp" />
+    <ClInclude Include="object_detection.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

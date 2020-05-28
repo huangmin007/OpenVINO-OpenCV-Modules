@@ -3,6 +3,7 @@
 //
 
 #include <iostream>
+#include <stdio.h>
 #include <vector>
 #include <chrono>
 #include <opencv2/opencv.hpp>
@@ -21,6 +22,7 @@
 
 //Mat BGR
 
+using namespace space;
 using namespace human_pose_estimation;
 
 //获取引擎的可计算设备列表
@@ -104,6 +106,7 @@ int main(int argc, char** argv)
     auto t1 = std::chrono::high_resolution_clock::now();
 
 
+    LOG("INFO") << "加载分析模型 ... " << std::endl;
     //----------------- 第三步：加载分析模型 ----------------
     HumanPoseEstimator estimator(model["path"], model["device"], false);
 
@@ -112,7 +115,7 @@ int main(int argc, char** argv)
     if (!capture.open(args.get<std::string>("input")))
     {
         capture.release();
-        LOG_ERROR << "打开输入源失败 ... " << std::endl;
+        LOG("ERROR") << "打开输入源失败 ... " << std::endl;
         return EXIT_FAILURE;
     }
     OutputSource output;
@@ -120,19 +123,27 @@ int main(int argc, char** argv)
     {
         output.release();
         capture.release();
-        LOG_ERROR << "打开输出源失败 ... " << std::endl;
+        LOG("ERROR") << "打开输出源失败 ... " << std::endl;
         return EXIT_FAILURE;
     }
 
     //读取第一帧数据
     size_t fid = 0;
-    cv::Mat curr_frame, next_frame;
-    capture.read(curr_frame, fid);
+    cv::Mat curr_frame, next_frame, show_frame;
+    if (!capture.read(curr_frame, fid))
+    {
+        LOG("ERROR") << "读取第一帧数据失败 ... " << std::endl;
+        output.release();
+        capture.release();
+        return EXIT_FAILURE;
+    }
     
     estimator.reshape(curr_frame);   // 如果发生网络重塑，请勿进行测量
     cv::Size graphSize{ static_cast<int>(curr_frame.cols / 4), 60 };
     Presenter presenter("", curr_frame.rows - graphSize.height - 10, graphSize);
-    
+    if (show) cv::namedWindow(title, cv::WINDOW_KEEPRATIO | cv::WINDOW_AUTOSIZE);
+
+    LOG("INFO") << "开始检测推断 ... " << std::endl;
     while (true)
     {
         if (!IsRunning) break;
@@ -147,7 +158,11 @@ int main(int argc, char** argv)
             if (next_frame.empty())
                 isLastFrame = true;
             else
-                throw std::logic_error("无法从输入源获取数据帧");
+            {
+                LOG("WARN") << "无法从输入源获取当前数据帧 ... " << std::endl;
+                Sleep(5);
+                continue;
+            }
         }
 
         //异步分析
@@ -187,7 +202,7 @@ int main(int argc, char** argv)
 
             for (HumanPose const& pose : poses)
             {
-                x_data << "\t<pose source=\"" << pose.score << "\">\r\n";
+                x_data << "\t<pose confidence=\"" << pose.score << "\">\r\n";
                 for (auto const& keypoint : pose.keypoints)
                     x_data << "\t\t<position>" << keypoint.x << "," << keypoint.y << "</position>\r\n";
 
@@ -200,15 +215,20 @@ int main(int argc, char** argv)
 #pragma endregion
 
             if (show)
-            {                
-                presenter.drawGraphs(curr_frame);
-                renderHumanPose(poses, curr_frame);
+            {        
+                curr_frame.copyTo(show_frame);
+                //cv::resize(curr_frame, show_frame, cv::Size(), 0.5, 0.5, cv::INTER_CUBIC);
+
+                presenter.drawGraphs(show_frame);
+                renderHumanPose(poses, show_frame);
+                //presenter.drawGraphs(curr_frame);
+                //renderHumanPose(poses, curr_frame);
 
                 std::ostringstream txt;
                 txt << "Frame ID:" << fid << "  Total Use Time: " << total_use_time << " ms";
-                cv::putText(curr_frame, txt.str(), cv::Point2f(10, 25), cv::FONT_HERSHEY_COMPLEX, 0.6, cv::Scalar(255, 0, 0));
+                cv::putText(show_frame, txt.str(), cv::Point2f(10, 25), cv::FONT_HERSHEY_COMPLEX, 0.6, cv::Scalar(255, 0, 0));
 
-                cv::imshow(title, curr_frame);
+                cv::imshow(title, show_frame);
             }
         }
 
@@ -244,12 +264,13 @@ int main(int argc, char** argv)
     }
     std::cout << std::endl;
 
+ exit:
     output.release(); 
     capture.release();
     
     if(show)    cv::destroyAllWindows();
 
-    std::cout << "[ INFO] Exiting ..." << std::endl;
+    LOG("INFO") << "Exiting ..." << std::endl;
     Sleep(500); 
 
     return EXIT_SUCCESS;

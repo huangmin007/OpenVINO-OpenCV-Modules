@@ -29,6 +29,7 @@
 #include "output_source.hpp"
 #include "static_functions.hpp"
 
+using namespace space;
 
 int main(int argc, char **argv)
 {
@@ -120,7 +121,7 @@ int main(int argc, char **argv)
     if (!capture.open(args.get<std::string>("input")))
     {
         capture.release();
-        LOG_ERROR << "打开输入源失败 ... " << std::endl;
+        LOG("ERROR") << "打开输入源失败 ... " << std::endl;
         return EXIT_FAILURE;
     }
     OutputSource output;
@@ -128,7 +129,7 @@ int main(int argc, char **argv)
     {
         output.release();
         capture.release();
-        LOG_ERROR << "打开输出源失败 ... " << std::endl;
+        LOG("ERROR") << "打开输出源失败 ... " << std::endl;
         return EXIT_FAILURE;
     }
 

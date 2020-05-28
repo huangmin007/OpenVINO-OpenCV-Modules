@@ -1,13 +1,13 @@
-﻿// PersonDetection.cpp : 此文件包含 "main" 函数。程序执行将在此处开始并结束。
+﻿// OpenOpseDetection.cpp : 此文件包含 "main" 函数。程序执行将在此处开始并结束。
 //
 
 #include <iostream>
 
-#include "person_detection.hpp"
+#include "pose_detection.hpp"
 #include "static_functions.hpp"
 #include "input_source.hpp"
 
-int main(int argc, char **argv)
+int main()
 {
     if (SetConsoleCtrlHandler((PHANDLER_ROUTINE)CloseHandlerRoutine, TRUE) == FALSE)
     {
@@ -19,9 +19,7 @@ int main(int argc, char **argv)
     //wait ...
 #pragma endregion
 
-    cv::Mat prev_frame, frame;
     InputSource inputSource;
-    //if (!inputSource.open("video:video.mp4"))
     if (!inputSource.open("camera:0:640x480"))
     {
         inputSource.release();
@@ -29,14 +27,14 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-
     InferenceEngine::Core ie;
-    PersonDetection detector("models\\person-detection-retail-0013\\FP32\\person-detection-retail-0013.xml","CPU", true);
+    PoseDetection detector("models\\hand_pose_iter_102000\\FP32\\pose_iter_160000.xml", "CPU", true);
     detector.read(ie);
 
+    cv::Mat prev_frame, frame;
     inputSource.read(frame);
 
-    std::vector<PersonDetection::Result> results;
+    std::vector<PoseDetection::Result> results;
     detector.enqueue(frame);
     detector.request();
 
@@ -47,7 +45,7 @@ int main(int argc, char **argv)
     double total_use_time = 0.0f;
     auto t0 = std::chrono::high_resolution_clock::now();
     auto t1 = std::chrono::high_resolution_clock::now();
-    
+
     while (true)
     {
         if (!IsRunning) break;
@@ -56,9 +54,9 @@ int main(int argc, char **argv)
         bool isLastFrame = !frameReadStatus;
 
         detector.wait();
-        if (detector.getResults(results))
+        if (detector.getResults(results, prev_frame))
         {
-            cv::imshow("Person Detection", frame);
+            cv::imshow("Pose Detection", prev_frame);
         }
 
         //if (isLastFrame)
@@ -72,8 +70,7 @@ int main(int argc, char **argv)
         if (!inputSource.read(frame))
         {
             LOG_WARN << "读取帧失败 ... " << std::endl;
-            //std::this_thread::sleep_for(100);
-            Sleep(WaitKeyDelay);
+            Sleep(10);
             continue;
         }
 
@@ -82,12 +79,14 @@ int main(int argc, char **argv)
             std::stringstream txt;
             txt << "Label:" << results[i].label << " Conf:" << results[i].confidence;
 
-            cv::rectangle(frame, results[i].location, cv::Scalar(0, 255, 0), 2);
-            cv::putText(frame, txt.str(), cv::Point(results[i].location.x, results[i].location.y), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 255), 1);
+            //cv::rectangle(frame, results[i].location, cv::Scalar(0, 255, 0), 2);
+            //cv::putText(frame, txt.str(), cv::Point(results[i].location.x, results[i].location.y), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 255), 1);
         }
 
         detector.enqueue(frame);
         detector.request();
+
+        prev_frame = frame.clone();
 
         t1 = std::chrono::high_resolution_clock::now();
         total_use_time = std::chrono::duration_cast<ms>(t1 - t0).count();

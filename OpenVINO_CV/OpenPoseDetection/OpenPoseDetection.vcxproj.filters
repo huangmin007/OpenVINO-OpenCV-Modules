@@ -15,15 +15,15 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
+    <ClCompile Include="pose_detection.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="person_detection.cpp">
+    <ClCompile Include="OpenPoseDetection.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="person_detection.hpp">
+    <ClInclude Include="pose_detection.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
