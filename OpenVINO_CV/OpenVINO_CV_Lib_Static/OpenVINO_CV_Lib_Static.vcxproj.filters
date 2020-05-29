@@ -24,9 +24,6 @@
     <ClInclude Include="cmdline.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="log.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="static_functions.hpp">
       <Filter>头文件</Filter>
     </ClInclude>

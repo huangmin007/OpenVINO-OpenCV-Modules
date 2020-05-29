@@ -158,7 +158,6 @@
     <ClInclude Include="framework.h" />
     <ClInclude Include="input_source.hpp" />
     <ClInclude Include="io_data_format.hpp" />
-    <ClInclude Include="log.h" />
     <ClInclude Include="output_source.hpp" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="static_functions.hpp" />

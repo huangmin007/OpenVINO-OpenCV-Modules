@@ -255,7 +255,8 @@ namespace space
             {"path", ""},
             {"model", ""},
             {"fp", "FP16"},
-            {"device", "CPU"}
+            {"device", "CPU"},
+            {"full", ""}
         };
 
         std::vector<std::string> model = SplitString(args, ':');
@@ -271,6 +272,7 @@ namespace space
         //model[:fp[:device(HETERO:CPU,GPU)]]
         if (length >= 4)     argMap["device"] = model[2] + ":" + model[3];
 
+        argMap["full"] = argMap["model"] + ":" + argMap["fp"] + ":" + argMap["device"];
         argMap["path"] = "models\\" + argMap["model"] + "\\" + argMap["fp"] + "\\" + argMap["model"] + ".xml";
 
         return argMap;
@@ -491,4 +493,36 @@ namespace space
         }
         return 0;
     }
+
+    /// <summary>
+    /// 缩放 cv::Rect 对象
+    /// </summary>
+    /// <param name="rect"></param>
+    /// <param name="scale">放大比例</param>
+    /// <param name="dx_offset">按 x 方向偏移系数</param>
+    /// <param name="dy_offset">按 y 方向偏移系数</param>
+    /// <returns></returns>
+    inline cv::Rect ScaleRectangle(const cv::Rect& rect, float scale = 1.2, float dx_offset = 1.0, float dy_offset = 1.0)
+    {
+        int width = rect.width;
+        int height = rect.height;
+
+        int center_x = rect.x + width / 2;
+        int center_y = rect.y + height / 2;
+
+        int max_of_size = std::max(width, height);
+
+        int new_width = static_cast<int>(scale * max_of_size);
+        int new_height = static_cast<int>(scale * max_of_size);
+
+        cv::Rect new_rect;
+        new_rect.x = center_x - static_cast<int>(std::floor(dx_offset * new_width / 2));
+        new_rect.y = center_y - static_cast<int>(std::floor(dy_offset * new_height / 2));
+
+        new_rect.width = new_width;
+        new_rect.height = new_height;
+
+        return new_rect;
+    }
+
 }

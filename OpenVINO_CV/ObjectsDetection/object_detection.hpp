@@ -12,7 +12,7 @@ namespace space
 
 #pragma region ObjectDetection
 	/// <summary>
-	/// ObjectDetection 对象检测基类(Open Model Zoo)
+	/// ObjectDetection 对象检测 (Open Model Zoo)
 	/// </summary>
 	class ObjectDetection
 	{
@@ -23,7 +23,7 @@ namespace space
 			int id;								// ID of the image in the batch
 			int label;							// predicted class ID
 			float confidence;					// confidence for the predicted class
-			std::vector<cv::Rect> rectangle;	// coordinates of the bounding box corner
+			cv::Rect location;					// coordinates of the bounding box corner
 		};
 
 		/// <summary>
@@ -31,6 +31,13 @@ namespace space
 		/// </summary>
 		/// <param name="isDebug">是否运行调试输出状态</param>
 		ObjectDetection(bool isDebug = false);
+		/// <summary>
+		/// 对象检测构造函数
+		/// </summary>
+		/// <param name="outputLayerNames">多层的网络输出名称</param>
+		/// <param name="isDebug"></param>
+		/// <returns></returns>
+		ObjectDetection(const std::vector<std::string> &outputLayerNames, bool isDebug = false);
 		~ObjectDetection();
 
 		/// <summary>
@@ -91,8 +98,8 @@ namespace space
 		InferenceEngine::ICNNNetwork::InputShapes inputShapes;
 		//输出数据集信息
 		InferenceEngine::OutputsDataMap outputsInfo;
-		//输出 Shapes
-		InferenceEngine::SizeVector outputShapes;
+		//网络输出层的第一层 张量尺寸大小
+		InferenceEngine::SizeVector firstOutputSize;
 		
 		// 当前帧推断请求对象
 		InferenceEngine::InferRequest::Ptr requestPtrCurr;
@@ -144,15 +151,19 @@ namespace space
 		/// <returns></returns>
 		bool hasResults();
 
-		
-		//bool createOutputShared(const std::string &output_name, size_t output_size);
-
-
 	private:
 		std::stringstream debug_title;
 
-		HANDLE pFile;
-		PVOID  pBuffer;
+		//HANDLE pMapFile;
+		//PVOID  pBuffer;
+
+		//指定的输出层名称，一般多层输出才需要指定名称
+		std::vector<std::string> output_layer_names;
+
+		std::vector<PVOID> pBuffers;
+		std::vector<HANDLE> pMapFiles;
+		//共享网络层输出数据信息
+		std::vector<std::pair<std::string, size_t>> shared_layer_infos;
 	};
 
 #pragma endregion
