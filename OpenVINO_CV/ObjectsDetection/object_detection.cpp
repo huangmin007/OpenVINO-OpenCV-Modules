@@ -92,7 +92,6 @@ namespace space
 		inputShapes = cnnNetwork.getInputShapes();
 		//设置第一层的输入精度为 U8，输入为图像数据 uint8_t
 		inputsInfo.begin()->second->setPrecision(InferenceEngine::Precision::U8);
-
 		//print inputs info
 		for (const auto& input : inputsInfo)
 		{
@@ -122,6 +121,17 @@ namespace space
 		outputsInfo = cnnNetwork.getOutputsInfo();
 		//第一层的输出精度，为 FP32 float 浮点型，使用比例信息数据
 		outputsInfo.begin()->second->setPrecision(InferenceEngine::Precision::FP32);
+		//print outputs info
+		for (const auto& output : outputsInfo)
+		{
+			InferenceEngine::SizeVector outputDims = output.second->getTensorDesc().getDims();
+			std::stringstream shape; shape << "[";
+			for (int i = 0; i < outputDims.size(); i++)
+				shape << outputDims[i] << (i != outputDims.size() - 1 ? "x" : "]");
+
+			std::vector<std::string>::iterator iter = find(output_layer_names.begin(), output_layer_names.end(), output.first);
+			LOG("INFO") << "\tOutput Name:[" << output.first << "]  Shape:" << shape.str() << "  Precision:[" << output.second->getPrecision() << "]" << (iter != output_layer_names.end() ? "  \t[√]" : "") << std::endl;
+		}
 
 		//一层网络输出
 		if (outputsInfo.size() == 1)
@@ -156,7 +166,7 @@ namespace space
 		else
 		{
 			if(output_layer_names.size() < 2)
-				THROW_IE_EXCEPTION << "当前网络模型为多层输出，但未指定多层网络输出名称 ... ";
+				THROW_IE_EXCEPTION << "当前网络模型为多层输出，但未选定网络输出名称 ... ";
 
 			for (auto& output : outputsInfo)
 			{
@@ -172,17 +182,6 @@ namespace space
 			}
 		}
 
-		//print outputs info
-		for (const auto& output : outputsInfo)
-		{
-			InferenceEngine::SizeVector outputDims = output.second->getTensorDesc().getDims();
-			std::stringstream shape; shape << "[";
-			for (int i = 0; i < outputDims.size(); i++)
-				shape << outputDims[i] << (i != outputDims.size() - 1 ? "x" : "]");
-
-			std::vector<std::string>::iterator iter = find(output_layer_names.begin(), output_layer_names.end(), output.first);
-			LOG("INFO") << "\tOutput Name:[" << output.first << "]  Shape:" << shape.str() << "  Precision:[" << output.second->getPrecision() << "]" << (iter != output_layer_names.end() ? "  \t[√]" : "") << std::endl;
-		}
 	}
 
 	void ObjectDetection::request(const cv::Mat& frame, int frame_idx)

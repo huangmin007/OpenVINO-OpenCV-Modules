@@ -73,14 +73,12 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
-    //未完成 labels 加载
     std::cout << "通用对象检测模块 说明：" << std::endl;
-    std::cout << "1.对象检测一般输出的数据为标定的对象边界线，也就是 Box " << std::endl;
-    std::cout << "2.支持一个网络层的输入，输入参数为：[BxCxHxW] = [1x3xHxW]" << std::endl;
-    std::cout << "3.支持一个或多个网络层的输出，输出为共享内存数据，与源网络层输出数据一致，共享名称为网络输出层名称" << std::endl;
-    std::cout << "4.在 show 模式下，做为示例暂时只处理了：a).单层输出[1,1,N,7]  b).两层输出[N,5][N]" << std::endl;
+    std::cout << "1.支持一个网络层的输入，输入参数为：[BxCxHxW] = [1x3xHxW]" << std::endl;
+    std::cout << "2.支持一个或多个网络层的输出，输出为共享内存数据，与源网络层输出数据一致，共享名称为网络输出层名称" << std::endl;
+    std::cout << "3.对象检测一般输出的数据为标定的对象边界线，也就是 Box " << std::endl;
+    std::cout << "4.在 show 模式下，只解析了默认两例作为示例：a).单层输出[1,1,N,7]  b).两层输出[N,5][N]" << std::endl;
     std::cout << "\r\n" << std::endl;
-
 
 #pragma region cmdline参数设置解析
 //---------------- 第一步：设计输入参数 --------------confidence
@@ -92,7 +90,7 @@ int main(int argc, char** argv)
     args.add<std::string>("model", 'm', "用于 AI识别检测 的 网络模型名称/文件(.xml)和目标设备，格式：(AI模型名称)[:精度[:硬件]]，"
         "示例：face-detection-adas-0001:FP32:CPU 或 face-detection-adas-0001:FP16:GPU", false, "face-detection-0105:FP32:CPU");
     //face-detection-adas-0001,person-detection-retail-0013,face-detection-0105
-    args.add<std::string>("output_layer_names", 'o', "(output layer name)多层网络输出参数，单层使用默认输出，网络层名称，以':'分割，区分大小写，格式：(layerName):(layername):(...)", false, "boxes/Split.0:labels");
+    args.add<std::string>("output_layer_names", 'o', "(output layer name)多层网络输出参数，单层使用默认输出，网络层名称，以':'分割，区分大小写，格式：layerName:layerName:...", false, "");
     args.add<float>("conf", 'c', "检测结果的置信度阈值(confidence threshold)", false, 0.5);
 
     args.add<bool>("async", 0, "是否异步分析识别", false, true);
@@ -113,7 +111,7 @@ int main(int argc, char** argv)
     }
     if (args.exist("info"))
     {
-        InferenceEngineInfomation();
+        InferenceEngineInfomation(args.get<std::string>("model"));
         return EXIT_SUCCESS;
     }
     if (!isParser)
@@ -129,8 +127,7 @@ int main(int argc, char** argv)
     std::vector<std::string> output_layer_names = SplitString(args.get<std::string>("output_layer_names"), ':');
 
 #pragma region ReadLebels
-    std::vector<std::string> labels;
-    
+    std::vector<std::string> labels;    
     std::string labels_file = "models\\" + model["model"] + "\\labels.txt";
     std::fstream file(labels_file, std::fstream::in);
     if (!file.is_open())
@@ -168,6 +165,7 @@ int main(int argc, char** argv)
 
         inputSource.read(frame);
         detector.request(frame);
+
         std::vector<ObjectDetection::Result> results;
         std::stringstream title;
         title << "Object Detection [" << model["full"] << "]";

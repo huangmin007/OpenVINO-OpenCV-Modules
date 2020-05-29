@@ -6,46 +6,90 @@
 #include <inference_engine.hpp>
 #include <ie_plugin_config.hpp>
 
-#define WIDTH 16
-#define LOG(type)    (std::cout << "[" << std::setw(5) << std::right << type << "] ")
+#include "cmdline.h"
+#include "static_functions.hpp"
 
 
-int main()
+int main(int argc, char** argv)
 {
-    //-------------------------------- 版本信息 --------------------------------
-    const InferenceEngine::Version* version = InferenceEngine::GetInferenceEngineVersion();
-
-    std::cout.setf(std::ios::left);
-    std::cout << "[InferenceEngine]" << std::endl;
-    std::cout << std::setw(WIDTH) << "Version:"  << version << std::endl;
-    std::cout << std::setw(WIDTH) << "Major:" << version->apiVersion.major << std::endl;
-    std::cout << std::setw(WIDTH) << "Minor:" << version->apiVersion.minor << std::endl;
-    std::cout << std::setw(WIDTH) << "BuildNumber:" << version->buildNumber << std::endl;
-    std::cout << std::setw(WIDTH) << "Description:" << version->description << std::endl;
-    std::cout << std::endl;
-
-    //-------------------------------- 支持的硬件设备 --------------------------------
-    InferenceEngine::Core core;
-
-    //GetAvailableDevices()
-    std::vector<std::string> devices = core.GetAvailableDevices();
-    std::cout << std::setw(WIDTH) << "Support Devices:";
-    for (const auto& device : devices)
-        std::cout << " " << device;
-    std::cout << std::endl;
-    
-    //GetConfig()
-    //bool dumpDotFile = core.GetConfig("HETERO", HETERO_CONFIG_KEY(DUMP_GRAPH_DOT)).as<bool>();
-
-    //GetMetric()
-    for (int i = 0; i < devices.size(); i++)
+    try
     {
-        std::string deviceName = core.GetMetric(devices[i], METRIC_KEY(FULL_DEVICE_NAME)).as<std::string>();
-        std::cout << "\t\t" << devices[i] << "::" << deviceName << std::endl;
+        cmdline::parser args;
+        args.add<std::string>("model", 'm', "输入模型名称", false, "");
+        args.parse(argc, argv);
+
+        //-------------------------------- 版本信息 --------------------------------
+        const InferenceEngine::Version* version = InferenceEngine::GetInferenceEngineVersion();
+
+        LOG("INFO") << "[Inference Engine]" << std::endl;
+        LOG("INFO") << "Major:" << version->apiVersion.major << std::endl;
+        LOG("INFO") << "Minor:" << version->apiVersion.minor << std::endl;
+        LOG("INFO") << "Version:" << version << std::endl;
+        LOG("INFO") << "BuildNumber:" << version->buildNumber << std::endl;
+        LOG("INFO") << "Description:" << version->description << std::endl;
+        std::cout << std::endl;
+
+        InferenceEngine::Core ie;
+        //-------------------------------- 网络模型信息 --------------------------------
+        std::map<std::string, std::string> model = space::ParseArgsForModel(args.get<std::string>("model"));
+        if (args.exist("model") && !model["model"].empty() && !model["path"].empty())
+        {
+            LOG("INFO") << "[Network Model Infomation] " << model["model"] << std::endl;
+            InferenceEngine::CNNNetwork cnnNetwork = ie.ReadNetwork(model["path"]);
+
+            LOG("INFO") << "Newtork Name:" << cnnNetwork.getName() << std::endl;
+            //------------Input-----------
+            LOG("INFO") << "Input Layer" << std::endl;
+            InferenceEngine::InputsDataMap inputsInfo = cnnNetwork.getInputsInfo();
+            for (const auto& input : inputsInfo)
+            {
+                InferenceEngine::SizeVector inputDims = input.second->getTensorDesc().getDims();
+
+                std::stringstream shape; shape << "[";
+                for (int i = 0; i < inputDims.size(); i++)
+                    shape << inputDims[i] << (i != inputDims.size() - 1 ? "x" : "]");
+
+                LOG("INFO") << "\tOutput Name:[" << input.first << "]  Shape:" << shape.str() << "  Precision:[" << input.second->getPrecision() << "]" << std::endl;
+            }
+
+            //------------Output-----------
+            LOG("INFO") << "Output Layer" << std::endl;
+            InferenceEngine::OutputsDataMap outputsInfo = cnnNetwork.getOutputsInfo();
+            for (const auto& output : outputsInfo)
+            {
+                InferenceEngine::SizeVector outputDims = output.second->getTensorDesc().getDims();
+                std::stringstream shape; shape << "[";
+                for (int i = 0; i < outputDims.size(); i++)
+                    shape << outputDims[i] << (i != outputDims.size() - 1 ? "x" : "]");
+
+                LOG("INFO") << "\tOutput Name:[" << output.first << "]  Shape:" << shape.str() << "  Precision:[" << output.second->getPrecision() << "]" << std::endl;
+            }
+
+            std::cout << std::endl;
+        }
+
+        //-------------------------------- 支持的硬件设备信息 --------------------------------
+        LOG("INFO") << "[Support Target Devices]";
+        std::vector<std::string> devices = ie.GetAvailableDevices();
+        for (const auto& device : devices)
+        {
+            std::string deviceFullName = ie.GetMetric(device, METRIC_KEY(FULL_DEVICE_NAME)).as<std::string>();
+            LOG("INFO") << "[" << device << "] " << deviceFullName << std::endl;
+        }
+        std::cout << std::endl;
     }
-    std::cout << std::endl;
+    catch (const std::exception& ex)
+    {
+        LOG("ERROR") << ex.what() << std::endl;
+    }
+    catch (...)
+    {
+        LOG("ERROR") << "未知错误/异常 ... " << std::endl;
+    }
 
     system("pause");
+    std::cout << std::endl;
+
     return EXIT_SUCCESS;
 }
 

@@ -52,31 +52,65 @@ namespace space
     /// <summary>
     /// 输出 InferenceEngine 引擎版本，及可计算设备列表
     /// </summary>
-    inline void InferenceEngineInfomation()
+    inline void InferenceEngineInfomation(std::string modelInfo = "")
     {
-        static size_t width = 16;
-
         //-------------------------------- 版本信息 --------------------------------
-        const InferenceEngine::Version* ie_version = InferenceEngine::GetInferenceEngineVersion();
+        const InferenceEngine::Version* version = InferenceEngine::GetInferenceEngineVersion();
 
-        std::cout.setf(std::ios::left);
-        std::cout << "[InferenceEngine]" << std::endl;
-        std::cout << std::setw(width) << "Version:" << ie_version << std::endl;
-        std::cout << std::setw(width) << "Major:" << ie_version->apiVersion.major << std::endl;
-        std::cout << std::setw(width) << "Minor:" << ie_version->apiVersion.minor << std::endl;
-        std::cout << std::setw(width) << "BuildNumber:" << ie_version->buildNumber << std::endl;
-        std::cout << std::setw(width) << "Description:" << ie_version->description << std::endl;
+        LOG("INFO") << "[Inference Engine]" << std::endl;
+        LOG("INFO") << "Major:" << version->apiVersion.major << std::endl;
+        LOG("INFO") << "Minor:" << version->apiVersion.minor << std::endl;
+        LOG("INFO") << "Version:" << version << std::endl;
+        LOG("INFO") << "BuildNumber:" << version->buildNumber << std::endl;
+        LOG("INFO") << "Description:" << version->description << std::endl;
+        std::cout << std::endl;
+
+        InferenceEngine::Core ie;
+        //-------------------------------- 网络模型信息 --------------------------------
+        std::map<std::string, std::string> model = ParseArgsForModel(modelInfo);
+        if (!model["model"].empty() && !model["path"].empty())
+        {
+            LOG("INFO") << "[Network Model Infomation] " << std::endl;
+            InferenceEngine::CNNNetwork cnnNetwork = ie.ReadNetwork(model["path"]);
+
+            LOG("INFO") << "Newtork Name:" << cnnNetwork.getName() << std::endl;
+            //------------Input-----------
+            LOG("INFO") << "Input Layer" << std::endl;
+            InferenceEngine::InputsDataMap inputsInfo = cnnNetwork.getInputsInfo();
+            for (const auto& input : inputsInfo)
+            {
+                InferenceEngine::SizeVector inputDims = input.second->getTensorDesc().getDims();
+
+                std::stringstream shape; shape << "[";
+                for (int i = 0; i < inputDims.size(); i++)
+                    shape << inputDims[i] << (i != inputDims.size() - 1 ? "x" : "]");
+
+                LOG("INFO") << "\tOutput Name:[" << input.first << "]  Shape:" << shape.str() << "  Precision:[" << input.second->getPrecision() << "]" << std::endl;
+            }
+
+            //------------Output-----------
+            LOG("INFO") << "Output Layer" << std::endl;
+            InferenceEngine::OutputsDataMap outputsInfo = cnnNetwork.getOutputsInfo();
+            for (const auto& output : outputsInfo)
+            {
+                InferenceEngine::SizeVector outputDims = output.second->getTensorDesc().getDims();
+                std::stringstream shape; shape << "[";
+                for (int i = 0; i < outputDims.size(); i++)
+                    shape << outputDims[i] << (i != outputDims.size() - 1 ? "x" : "]");
+
+                LOG("INFO") << "\tOutput Name:[" << output.first << "]  Shape:" << shape.str() << "  Precision:[" << output.second->getPrecision() << "]" << std::endl;
+            }
+
+            std::cout << std::endl;
+        }
 
         //-------------------------------- 支持的硬件设备 --------------------------------
-        InferenceEngine::Core core;
-        std::vector<std::string> devices = core.GetAvailableDevices();
-
-        std::cout << "[SupportDevices]" << std::endl;
+        LOG("INFO") << "[Support Target Devices]";
+        std::vector<std::string> devices = ie.GetAvailableDevices();
         for (const auto& device : devices)
         {
-            std::string dn = core.GetMetric(device, METRIC_KEY(FULL_DEVICE_NAME)).as<std::string>();
-
-            std::cout << std::setw(width) << " (" << device << ") " << dn << std::endl;
+            std::string deviceFullName = ie.GetMetric(device, METRIC_KEY(FULL_DEVICE_NAME)).as<std::string>();
+            LOG("INFO") << "[" << device << "] " << deviceFullName << std::endl;
         }
         std::cout << std::endl;
 
