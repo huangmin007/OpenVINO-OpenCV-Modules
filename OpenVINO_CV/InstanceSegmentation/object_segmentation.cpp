@@ -39,11 +39,6 @@ namespace space
 			cnnNetwork = ie.ReadNetwork(modelPath);
 			cnnNetwork.setBatchSize(1);
 
-			//inputShapes = cnnNetwork.getInputShapes();
-			//inputShapes.begin()->second[0] = 1;
-			//cnnNetwork.reshape(inputShapes);
-			//input_name = inputShapes.begin()->first;
-
 #pragma region 配置网络层的输入信息
 			//-------------------- 配置网络层的输入信息 -------------------
 			LOG("INFO") << "\t配置网络输入  ... " << std::endl;
@@ -71,6 +66,7 @@ namespace space
 			LOG("INFO") << "\t配置网络输出  ... " << std::endl;
 			outputsInfo = cnnNetwork.getOutputsInfo();
 			outputsInfo.begin()->second->setPrecision(InferenceEngine::Precision::FP32);
+
 			//print outputs info
 			for (const auto& output : outputsInfo)
 			{
@@ -87,17 +83,13 @@ namespace space
 			if (outputsInfo.size() == 1)
 			{
 				output_name = outputsInfo.begin()->first;
-				outputSize = outputsInfo.begin()->second->getTensorDesc().getDims();
+				outputSizeVector = outputsInfo.begin()->second->getTensorDesc().getDims();
 
+				//将输出层添加到共享
 				size_t shared_size = 1;
-				for (auto& v : outputSize) shared_size *= v;
+				for (auto& v : outputSizeVector) shared_size *= v;
 				shared_layer_infos.clear();
 				shared_layer_infos.push_back({ output_name, shared_size * 4 });
-
-				std::cout << "B:" << getTensorBatch(outputsInfo.begin()->second->getTensorDesc()) <<
-					" C:" << getTensorChannels(outputsInfo.begin()->second->getTensorDesc()) <<
-					" H:" << getTensorHeight(outputsInfo.begin()->second->getTensorDesc()) <<
-					" W:" << getTensorWidth(outputsInfo.begin()->second->getTensorDesc()) << std::endl;
 			}
 			//多层网络输出
 			else
@@ -105,6 +97,7 @@ namespace space
 				if (output_layer_names.size() < 2)
 					THROW_IE_EXCEPTION << "当前网络模型为多层输出，但未选定网络输出名称 ... ";
 
+				//将输出层添加到共享
 				for (auto& output : outputsInfo)
 				{
 					InferenceEngine::SizeVector outputDims = output.second->getTensorDesc().getDims();
@@ -128,7 +121,7 @@ namespace space
 			requestPtr = execNetwork.CreateInferRequestPtr();
 
 			//-------------------------配置数据共享---------------------------------------
-			LOG("INFO") << "正在创建共享内存块 ... " << std::endl;
+			LOG("INFO") << "正在创建/映射共享内存块 ... " << std::endl;
 			for (const auto& shared : shared_layer_infos)
 			{
 				LPVOID pBuffer;
@@ -139,8 +132,10 @@ namespace space
 					pBuffers.push_back(pBuffer);
 					pMapFiles.push_back(pMapFile);
 
-					//float* buffer = requestPtr->GetBlob(shared.first)->buffer().as<float*>();
-					//buffer = (float*)pBuffer;
+					//将输出层映射到内存共享
+					//重新设置指定输出层 Blob, 将指定输出层数据指向为共享指针，实现该层数据共享
+					requestPtr->SetBlob(shared.first, InferenceEngine::make_shared_blob<float>(
+							outputsInfo.find(shared.first)->second->getTensorDesc(), (float*)pBuffer));
 				}
 				else
 				{
@@ -179,34 +174,22 @@ namespace space
 		bool is_dense = strideW == channels && strideH == channels * frame_width;
 		if (!is_dense) THROW_IE_EXCEPTION << "不支持从非稠密 cv::Mat 转换";
 
-		//将输入图像内存数据指针共享给推断引擎，做实时或异步推断
-		InferenceEngine::TensorDesc tDesc(InferenceEngine::Precision::U8,
-			{ 1, channels, frame_height, frame_width }, InferenceEngine::Layout::NHWC);
+		//重新设置输入层 Blob，将输入图像内存数据指针共享给输入层，做实时或异步推断
+		//输入为图像原始尺寸，其实是会存在问题的，如果源图尺寸很大，那处理时间会更长
+		//InferenceEngine::TensorDesc tDesc(InferenceEngine::Precision::U8, { 1, channels, frame_height, frame_width }, InferenceEngine::Layout::NHWC);
+		//requestPtr->SetBlob(input_name, InferenceEngine::make_shared_blob<uint8_t>(tDesc, frame.data));
+		InferenceEngine::TensorDesc inputTensorDesc = inputsInfo.begin()->second->getTensorDesc();
+		InferenceEngine::TensorDesc tDesc(inputTensorDesc.getPrecision(), { 1, channels, frame_height, frame_width }, inputTensorDesc.getLayout());
 		requestPtr->SetBlob(input_name, InferenceEngine::make_shared_blob<uint8_t>(tDesc, frame.data));
 
-		for (int i = 0; i < shared_layer_infos.size(); i ++)
-		{
-			//InferenceEngine::TensorDesc output_Desc(InferenceEngine::Precision::FP32,
-			//	outputsInfo.begin()->second->getDims(), outputsInfo.begin()->second->getLayout());
-
-			std::string o_name = shared_layer_infos[i].first;
-			requestPtr->SetBlob(o_name, 
-				InferenceEngine::make_shared_blob<float>(
-					outputsInfo.find(o_name)->second->getTensorDesc(), 
-					(float*)pBuffers[i]));
-		}
-
-		//InferenceEngine::TensorDesc output_Desc(InferenceEngine::Precision::FP32,
-		//	outputsInfo.begin()->second->getDims(), outputsInfo.begin()->second->getLayout());
-		//InferenceEngine::make_shared_blob<float>(output_Desc, (float*)pBuffers[0]);
-		//requestPtr->SetBlob(output_name, InferenceEngine::make_shared_blob<float>(output_Desc, (float*)pBuffers[0]));
-
+		//设置异步推理完成回调
+		//可以读取包含推理结果的输出，并将新输入再次用于重复异步请求
 		requestPtr->SetCompletionCallback(
 			[&]
 			{
 				t1 = std::chrono::high_resolution_clock::now();
 				total_use_time = std::chrono::duration_cast<ms>(t1 - t0).count();				
-				std::cout << "\33[2K\r[ INFO] " << "Total Use Time: " << total_use_time;
+				//std::cout << "\33[2K\r[ INFO] " << "Total Use Time: " << total_use_time;
 
 				updateDisplay();
 
@@ -220,8 +203,8 @@ namespace space
 		requestPtr->StartAsync();
 		t0 = std::chrono::high_resolution_clock::now();
 
-		InferenceEngine::StatusCode code = requestPtr->Wait(InferenceEngine::IInferRequest::WaitMode::STATUS_ONLY);
-		std::cout << "Code::" << code << std::endl;
+		//InferenceEngine::StatusCode code = requestPtr->Wait(InferenceEngine::IInferRequest::WaitMode::STATUS_ONLY);
+		//std::cout << "Code::" << code << std::endl;
 	}
 
 	double ObjectSegmentation::getUseTime() const
@@ -231,15 +214,6 @@ namespace space
 
 	void ObjectSegmentation::updateDisplay()
 	{
-		//copy to shared memory
-		//for (int i = 0; i < pBuffers.size(); i++)
-		{
-			//InferenceEngine::Blob::Ptr bolb = requestPtr->GetBlob(shared_layer_infos[i].first);
-
-			//const float* buffer = bolb->buffer().as<float*>();
-			//std::copy(buffer, buffer + bolb->size(), (float*)pBuffers[i]);
-		}
-
 		if (!is_debug) return;
 		
 		//单层输出
@@ -248,25 +222,23 @@ namespace space
 		if (outputsInfo.size() == 1)
 		{
 			int width, height, channels;
-			if (outputSize.size() == 3)
+			if (outputSizeVector.size() == 3)
 			{
 				channels = 0;
-				height = outputSize[1];
-				width = outputSize[2];
+				height = outputSizeVector[1];
+				width = outputSizeVector[2];
 			}
-			else if (outputSize.size() == 4)
+			else if (outputSizeVector.size() == 4)
 			{
-				channels = outputSize[1];
-				height = outputSize[2];
-				width = outputSize[3];
+				channels = outputSizeVector[1];
+				height = outputSizeVector[2];
+				width = outputSizeVector[3];
 			}
 			else
 			{
 				return;
 			}
 
-			//const float* buffer = requestPtr->GetBlob(output_name)->buffer().as<float*>();
-			//buffer = (float*)pBuffers[0];
 			const float* buffer = (float*)pBuffers[0];
 
 			if (mask_img.empty())
@@ -297,7 +269,7 @@ namespace space
 							}
 						}
 					}
-					//现有的颜色表数量不够，添加
+					//现有的颜色表数量不够，添加几个
 					while (classId >= colors.size())
 					{
 						static std::mt19937 rng;
@@ -319,30 +291,25 @@ namespace space
 
 			return;
 		}
+#if 后面在处理
 		//多层输出
 		if (shared_layer_infos.size() == 2)
 		{
-			InferenceEngine::SizeVector outputSize = outputsInfo[shared_layer_infos[0].first]->getTensorDesc().getDims();
+			//if (outputSizeVector.size() == 3 && outputSizeVector.back() == 5)
+			//{
+				//const float* buffer0 = (float*)pBuffers[0];
+				//const float* buffer1 = (float*)pBuffers[0];
 
-			if (outputSize.size() == 2 && outputSize.back() == 5)
-			{
-				const float* buffer0 = requestPtr->GetBlob(shared_layer_infos[0].first)->buffer().as<float*>();
-				const float* buffer1 = requestPtr->GetBlob(shared_layer_infos[1].first)->buffer().as<float*>();
+				//return;
+			//}
 
-				for (int i = 0; i < outputSize[0]; i++)
-				{
-
-				}
-
-				return;
-			}
-
+			return;
 		}
 		else
 		{
 			LOG("WARN") << "调试模式下未分析网络输出数据，output layouts: " << outputsInfo.size() << std::endl;
 		}
-
+#endif
 		return;
 	}
 

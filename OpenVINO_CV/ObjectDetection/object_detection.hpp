@@ -81,6 +81,10 @@ namespace space
 		/// <returns></returns>
 		//InferenceEngine::ExecutableNetwork* operator ->();
 
+		void start();
+
+		void updateDebugShow(cv::Mat &frame);
+
 	protected:
 		
 		bool is_debug;		//是否输出部份调试信息
@@ -99,14 +103,13 @@ namespace space
 		//输出数据集信息
 		InferenceEngine::OutputsDataMap outputsInfo;
 		//网络输出层的第一层 张量尺寸大小
-		InferenceEngine::SizeVector firstOutputSize;
+		InferenceEngine::SizeVector outputSizeVector;
 		
 		// 当前帧推断请求对象
-		InferenceEngine::InferRequest::Ptr requestPtrCurr;
+		InferenceEngine::InferRequest::Ptr requestPtr;
 		// 下一帧推断请求对象
-		InferenceEngine::InferRequest::Ptr requestPtrNext;
+		//InferenceEngine::InferRequest::Ptr requestPtrNext;
 
-		uint16_t frame_count;		//输入帧队列数量
 		uint16_t frame_width;		//输入帧图像的宽
 		uint16_t frame_height;		//输入帧图像的高
 
@@ -123,11 +126,7 @@ namespace space
 		//是否已经获取结果标记，如果已经获取，需将该变量设置为 false
 		//该标记的作用是，不做结果的重复提取
 		bool results_flags;		
-
-		/// <summary>
-		/// Network I/O Config
-		/// </summary>
-		virtual void networkIOConfig();
+		bool has_results = false;
 
 		/// <summary>
 		/// cv::Mat U8 to IE Blob
@@ -137,22 +136,14 @@ namespace space
 		/// <param name="batchIndex"></param>
 		void matU8ToBlob(const cv::Mat& frame, InferenceEngine::Blob::Ptr& blob, int batchIndex = 0);
 
-		/// <summary>
-		/// 输入图像帧 to Blob 处理
-		/// </summary>
-		/// <param name="frame">原帧图像数据</param>
-		/// <param name="blob"></param>
-		/// <param name="batchIndex"></param>
-		virtual void inputFrameToBlob(const cv::Mat& frame, InferenceEngine::Blob::Ptr& blob, int batchIndex = 0);
-
-		/// <summary>
-		/// 是否存在结果
-		/// </summary>
-		/// <returns></returns>
-		bool hasResults();
+		
 
 	private:
 		std::stringstream debug_title;
+
+		double total_use_time = 0.0f;
+		std::chrono::steady_clock::time_point t0;
+		std::chrono::steady_clock::time_point t1;
 
 		//指定的输出层名称，一般多层输出才需要指定名称
 		std::vector<std::string> output_layer_names;

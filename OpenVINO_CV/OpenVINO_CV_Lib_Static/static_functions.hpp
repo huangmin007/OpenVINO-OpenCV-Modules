@@ -4,6 +4,7 @@
 #include <vector>
 #include <chrono>
 #include <string>
+#include <fstream>
 #include <sstream>
 #include <iostream>
 #include <Windows.h>
@@ -335,6 +336,33 @@ namespace space
             vec.push_back(src.substr(start));
 
         return vec;
+    }
+
+    /// <summary>
+    /// 读取标签文件
+    /// </summary>
+    /// <param name="labels_file"></param>
+    /// <returns></returns>
+    inline const std::vector<std::string> ReadLabels(const std::string& labels_file)
+    {
+        std::vector<std::string> labels;        
+        std::fstream file(labels_file, std::fstream::in);
+
+        if (!file.is_open())
+        {
+            LOG("WARN") << "标签文件不存在 " << labels_file << " 文件 ...." << std::endl;
+        }
+        else
+        {
+            std::string line;
+            while (std::getline(file, line))
+            {
+                labels.push_back(line);
+            }
+            file.close();
+        }
+
+        return labels;
     }
 
     /// <summary>

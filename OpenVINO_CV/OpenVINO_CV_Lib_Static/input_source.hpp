@@ -126,6 +126,7 @@ namespace space
 		bool isopen = false;			//输入源是否已经打开
 		cv::VideoCapture capture;		//用于视频源和相机源
 
+		std::string video_url;
 	};
 };
 

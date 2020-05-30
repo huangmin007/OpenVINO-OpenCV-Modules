@@ -129,8 +129,9 @@ namespace space
 				return false;
 			}
 
+			video_url = input[1];
 			//video(:url)
-			isopen = capture.open(input[1]);
+			isopen = capture.open(video_url);
 			//video(:url[:size])
 			if (length >= 3)
 			{
@@ -198,12 +199,25 @@ namespace space
 			return false;
 		}
 
+		bool isReadOK = false;
 		switch (type)
 		{
 		case InputType::VIDEO:
+			lastFrameID++;
+			isReadOK = capture.read(frame);
+			//÷ÿ∏¥≤•∑≈
+			if (!isReadOK)
+			{
+				lastFrameID = 0;
+				capture.open(video_url);
+				isReadOK = capture.read(frame);
+			}
+			return isReadOK;
+
 		case InputType::CAMERA:
 			lastFrameID++;
-			return capture.read(frame);
+			isReadOK = capture.read(frame);
+			return isReadOK;
 
 		case InputType::SHARED:
 #if USE_COPY_INPUT_METHOD

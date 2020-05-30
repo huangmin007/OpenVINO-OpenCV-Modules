@@ -74,7 +74,7 @@ namespace space
 		//输出数据集信息
 		InferenceEngine::OutputsDataMap outputsInfo;
 		//网络输出层的第一层 张量尺寸大小
-		InferenceEngine::SizeVector outputSize;
+		InferenceEngine::SizeVector outputSizeVector;
 
 		// 推断请求对象
 		InferenceEngine::InferRequest::Ptr requestPtr;
@@ -88,7 +88,7 @@ namespace space
 		void updateDisplay();
 
 	private:
-		//指定的输出层名称，一般多层输出才需要指定名称
+		//外部参数指定的输出层名称，一般多层输出才需要指定名称
 		std::vector<std::string> output_layer_names;
 
 		std::vector<LPVOID> pBuffers;

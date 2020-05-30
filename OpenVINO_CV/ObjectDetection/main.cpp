@@ -148,7 +148,7 @@ int main(int argc, char** argv)
 
 #pragma endregion
 
-    cv::Mat frame, next_frame;    
+    cv::Mat frame;// , next_frame;
     InputSource inputSource;
     if (!inputSource.open(args.get<std::string>("input")))
     {
@@ -187,12 +187,12 @@ int main(int argc, char** argv)
             use_time.str(""); 
             isResult = detector.getResults(results);
 
-            if (show)
+            if (show && isResult)
             {
                 use_time << "Detection Count:" << results.size() << "  Total Use Time:" << total_use_time << "ms";
 
-                if (!next_frame.empty())
-                    frame = next_frame;
+                //if (!next_frame.empty())
+                //    frame = next_frame;
 
                 DrawObjectBound(frame, results, labels);
                
@@ -205,13 +205,13 @@ int main(int argc, char** argv)
             }
             std::cout << "\33[2K\r[ INFO] " << use_time.str();
 
-            if (!inputSource.read(next_frame))
+            if (!inputSource.read(frame))
             {
                 LOG("WARN") << "读取数据帧失败 ... " << std::endl;
                 Sleep(15);
                 continue;
             }
-            detector.request(next_frame);
+            //detector.request(next_frame);
 
             t1 = std::chrono::high_resolution_clock::now();
             total_use_time = std::chrono::duration_cast<ms>(t1 - t0).count();
