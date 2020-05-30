@@ -130,7 +130,7 @@ namespace space
 			}
 
 			//video(:url)
-			capture.open(input[1]);
+			isopen = capture.open(input[1]);
 			//video(:url[:size])
 			if (length >= 3)
 			{

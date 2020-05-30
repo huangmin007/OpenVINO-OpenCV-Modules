@@ -202,14 +202,14 @@ namespace space
         handle = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, size, (LPCSTR)name);
         LPVOID message = NULL;
         DWORD ErrorID = GetLastErrorFormatMessage(message);     //GetLastError 检查 CreateFileMapping 状态
-        std::cout << "[ INFO] CreateFileMapping [" << name << "]  GetLastError:" << ErrorID << "  Message: " << (char*)message;
+        LOG("INFO") << "CreateFileMapping [" << name << "]  GetLastError:" << ErrorID << "  Message: " << (char*)message;
 
         if (ErrorID != 0 || handle == NULL) return false;
 
         ///映射到当前进程的地址空间视图
         buffer = MapViewOfFile(handle, FILE_WRITE_ACCESS, 0, 0, size);  //FILE_WRITE_ACCESS,FILE_MAP_ALL_ACCESS,,FILE_MAP_WRITE
         ErrorID = GetLastErrorFormatMessage(message);                   //GetLastError 检查 MapViewOfFile 状态
-        std::cout << "[ INFO] MapViewOfFile     [" << name << "]  GetLastError:" << ErrorID << "  Message:" << (char*)message;
+        LOG("INFO") << "MapViewOfFile     [" << name << "]  GetLastError:" << ErrorID << "  Message:" << (char*)message;
 
         if (ErrorID != 0 || buffer == NULL)
         {
@@ -235,7 +235,7 @@ namespace space
         //GetLastError 检查 OpenFileMapping 状态
         LPVOID message = NULL;
         DWORD ErrorID = GetLastErrorFormatMessage(message);
-        std::cout << "[ INFO] OpenFileMapping [" << name << "]  GetLastError:" << ErrorID << "  Message: " << (char*)message;
+        LOG("INFO") << "OpenFileMapping [" << name << "]  GetLastError:" << ErrorID << "  Message: " << (char*)message;
 
         if (ErrorID != 0 || handle == NULL) return false;
 
@@ -243,7 +243,7 @@ namespace space
         buffer = MapViewOfFile(handle, FILE_MAP_READ, 0, 0, 0);
         //GetLastError 检查 MapViewOfFile 状态
         ErrorID = GetLastErrorFormatMessage(message);
-        std::cout << "[ INFO] MapViewOfFile   [" << name << "]  GetLastError:" << ErrorID << "  Message:" << (char*)message;
+        LOG("INFO") << "MapViewOfFile   [" << name << "]  GetLastError:" << ErrorID << "  Message:" << (char*)message;
 
         if (ErrorID != 0 || buffer == NULL)
         {
@@ -396,6 +396,31 @@ namespace space
         {
             THROW_IE_EXCEPTION << "通道数量不受支持 ... ";
         }
+    }
+
+
+    /// <summary>
+    /// 通过新的Blob指针包装存储在传递的 cv::Mat 对象内部的数据，没有发生内存分配。该 Blob 仅指向已经存在的 cv::Mat 数据
+    /// </summary>
+    /// <param name="mat">给定具有图像数据的 cv::Mat 对象</param>
+    /// <returns>返回 Blob 指针</returns>
+    inline InferenceEngine::Blob::Ptr WrapMat2Blob(const cv::Mat& frame)
+    {
+        size_t channels = frame.channels();
+        size_t height = frame.size().height;
+        size_t width = frame.size().width;
+
+        size_t strideH = frame.step.buf[0];
+        size_t strideW = frame.step.buf[1];
+
+        bool is_dense = strideW == channels && strideH == channels * width;
+        if (!is_dense)
+            THROW_IE_EXCEPTION << "不支持从非稠密 cv::Mat 转换";
+
+        InferenceEngine::TensorDesc tDesc(InferenceEngine::Precision::U8,
+            { 1, channels, height, width }, InferenceEngine::Layout::NHWC);
+
+        return InferenceEngine::make_shared_blob<uint8_t>(tDesc, frame.data);
     }
 
     /// <summary>

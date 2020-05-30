@@ -12,7 +12,7 @@ namespace space
 
 #pragma region ObjectDetection
 	/// <summary>
-	/// ObjectDetection 对象检测 (Open Model Zoo)
+	/// Object Detection 对象检测 (Open Model Zoo)
 	/// </summary>
 	class ObjectDetection
 	{
@@ -84,7 +84,7 @@ namespace space
 	protected:
 		
 		bool is_debug;		//是否输出部份调试信息
-		bool is_async;				// 是否异步推断
+		bool is_async;				//是否异步推断
 		float confidence_threshold;	//数据信任阈值
 
 		//cnn 网络对象
@@ -154,13 +154,10 @@ namespace space
 	private:
 		std::stringstream debug_title;
 
-		//HANDLE pMapFile;
-		//PVOID  pBuffer;
-
 		//指定的输出层名称，一般多层输出才需要指定名称
 		std::vector<std::string> output_layer_names;
 
-		std::vector<PVOID> pBuffers;
+		std::vector<LPVOID> pBuffers;
 		std::vector<HANDLE> pMapFiles;
 		//共享网络层输出数据信息
 		std::vector<std::pair<std::string, size_t>> shared_layer_infos;

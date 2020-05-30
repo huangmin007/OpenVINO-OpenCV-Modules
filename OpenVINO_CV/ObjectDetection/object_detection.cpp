@@ -53,7 +53,7 @@ namespace space
 			LOG("INFO") << "正在创建共享内存块 ... " << std::endl;
 			for (const auto &shared:shared_layer_infos)
 			{
-				PVOID pBuffer;
+				LPVOID pBuffer;
 				HANDLE pMapFile;
 				
 				if (CreateOnlyWriteMapFile(pMapFile, pBuffer, shared.second, shared.first.c_str()))

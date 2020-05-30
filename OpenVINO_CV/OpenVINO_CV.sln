@@ -20,9 +20,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HumanPoseEstimation3D", "Hu
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "InteractiveFaceDetection", "InteractiveFaceDetection\InteractiveFaceDetection.vcxproj", "{84F798AE-10D7-43D4-8B47-8E2B825FAADE}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ObjectsDetection", "ObjectsDetection\ObjectsDetection.vcxproj", "{90F7BB57-60A4-474E-AC66-769974400A3F}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ObjectDetection", "ObjectDetection\ObjectDetection.vcxproj", "{90F7BB57-60A4-474E-AC66-769974400A3F}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OpenPoseDetection", "OpenPoseDetection\OpenPoseDetection.vcxproj", "{AF67CED8-5D7B-434B-A438-F27E7A557EBB}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "InstanceSegmentation", "InstanceSegmentation\InstanceSegmentation.vcxproj", "{7DC57BBC-51FF-4859-BE33-D8A248F8C6AF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -96,6 +98,14 @@ Global
 		{AF67CED8-5D7B-434B-A438-F27E7A557EBB}.Release|x64.Build.0 = Release|x64
 		{AF67CED8-5D7B-434B-A438-F27E7A557EBB}.Release|x86.ActiveCfg = Release|Win32
 		{AF67CED8-5D7B-434B-A438-F27E7A557EBB}.Release|x86.Build.0 = Release|Win32
+		{7DC57BBC-51FF-4859-BE33-D8A248F8C6AF}.Debug|x64.ActiveCfg = Debug|x64
+		{7DC57BBC-51FF-4859-BE33-D8A248F8C6AF}.Debug|x64.Build.0 = Debug|x64
+		{7DC57BBC-51FF-4859-BE33-D8A248F8C6AF}.Debug|x86.ActiveCfg = Debug|Win32
+		{7DC57BBC-51FF-4859-BE33-D8A248F8C6AF}.Debug|x86.Build.0 = Debug|Win32
+		{7DC57BBC-51FF-4859-BE33-D8A248F8C6AF}.Release|x64.ActiveCfg = Release|x64
+		{7DC57BBC-51FF-4859-BE33-D8A248F8C6AF}.Release|x64.Build.0 = Release|x64
+		{7DC57BBC-51FF-4859-BE33-D8A248F8C6AF}.Release|x86.ActiveCfg = Release|Win32
+		{7DC57BBC-51FF-4859-BE33-D8A248F8C6AF}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

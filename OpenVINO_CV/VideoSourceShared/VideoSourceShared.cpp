@@ -26,7 +26,7 @@ int main(int argc, char **argv)
 #pragma region 设置解析参数
     cmdline::parser args;
     args.add<std::string>("help", 'h', "参数说明", false, "");
-    args.add<std::string>("input", 'i', "输入视频或相机源，格式：-i (video|camera)[:value[:size]]", false, "cam:0:640x480");
+    args.add<std::string>("input", 'i', "输入视频或相机源，格式：-i (video|camera)[:value[:size]]", false, "camera:0:640x480");
     args.add<std::string>("output", 'o', "输出内存共享源，格式：-o (shared)[:name[:size]]", false, "shared:source.bin:8294400");
 #ifdef _DEBUG
     args.add<bool>("show", '\0', "是否显示视频窗口，用于调试", false, true);
@@ -75,7 +75,7 @@ int main(int argc, char **argv)
             << capture.get(cv::CAP_PROP_FRAME_HEIGHT) 
             << "]" << std::endl;
     }
-    else if (inputArr[0] == "url" || inputArr[0] == "void")
+    else if (inputArr[0] == "url" || inputArr[0] == "video")
     {
         if (length == 1)
         {
