@@ -287,11 +287,12 @@ namespace space
     {
         std::map<std::string, std::string> argMap
         {
-            {"path", ""},
-            {"model", ""},
-            {"fp", "FP16"},
-            {"device", "CPU"},
-            {"full", ""}
+            {"path", ""},           //模型文件路径
+            {"model", ""},          //模型名称
+            {"fp", "FP32"},         //模型文件精度
+            {"device", "CPU"},      //模型加载到使用的硬件
+            {"labelpath", ""},      //模型标签文件路径
+            {"full", ""}            //原始参数
         };
 
         std::vector<std::string> model = SplitString(args, ':');

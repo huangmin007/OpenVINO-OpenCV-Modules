@@ -158,12 +158,14 @@
     <ClInclude Include="framework.h" />
     <ClInclude Include="input_source.hpp" />
     <ClInclude Include="io_data_format.hpp" />
+    <ClInclude Include="open_model_inference.hpp" />
     <ClInclude Include="output_source.hpp" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="static_functions.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="input_source.cpp" />
+    <ClCompile Include="open_model_inference.cpp" />
     <ClCompile Include="output_source.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>

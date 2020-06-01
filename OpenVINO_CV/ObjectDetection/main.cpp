@@ -88,9 +88,9 @@ int main(int argc, char** argv)
 
     args.add<std::string>("input", 'i', "输入源参数，格式：(video|camera|shared)[:value[:value[:...]]]", false, "camera:0:1280x720");
     args.add<std::string>("model", 'm', "用于 AI识别检测 的 网络模型名称/文件(.xml)和目标设备，格式：(AI模型名称)[:精度[:硬件]]，"
-        "示例：face-detection-adas-0001:FP32:CPU 或 face-detection-adas-0001:FP16:GPU", false, "face-detection-adas-0001:FP32:CPU");
-    //face-detection-adas-0001,person-detection-retail-0013,face-detection-0105
-    args.add<std::string>("output_layer_names", 'o', "(output layer name)多层网络输出参数，单层使用默认输出，网络层名称，以':'分割，区分大小写，格式：layerName:layerName:...", false, "");
+        "示例：face-detection-adas-0001:FP32:CPU 或 face-detection-adas-0001:FP16:GPU", false, "face-detection-0105:FP32:CPU");
+    //face-detection-adas-0001,person-detection-retail-0013,face-detection-0105,boxes/Split.0:labels
+    args.add<std::string>("output_layer_names", 'o', "(output layer name)多层网络输出参数，单层使用默认输出，网络层名称，以':'分割，区分大小写，格式：layerName:layerName:...", false, "boxes/Split.0:labels");
     args.add<float>("conf", 'c', "检测结果的置信度阈值(confidence threshold)", false, 0.5);
 
     args.add<bool>("async", 0, "是否异步分析识别", false, true);
@@ -148,7 +148,7 @@ int main(int argc, char** argv)
 
 #pragma endregion
 
-    cv::Mat frame;// , next_frame;
+    cv::Mat frame;
     InputSource inputSource;
     if (!inputSource.open(args.get<std::string>("input")))
     {
@@ -160,11 +160,14 @@ int main(int argc, char** argv)
     try
     {
         InferenceEngine::Core ie;
-        ObjectDetection detector(output_layer_names, show);
-        detector.config(ie, args.get<std::string>("model"), async, conf);
+        ObjectDetection detector(output_layer_names, true, show);
+        detector.Configuration(ie, args.get<std::string>("model"));
+        detector.SetParameters(conf, labels);
+
+        std::map<std::string, std::string> model = ParseArgsForModel(args.get<std::string>("model"));
 
         inputSource.read(frame);
-        detector.request(frame);
+        //detector.ReshapeInput(frame);
 
         std::vector<ObjectDetection::Result> results;
         std::stringstream title;
@@ -185,23 +188,23 @@ int main(int argc, char** argv)
             t0 = std::chrono::high_resolution_clock::now();
 
             use_time.str(""); 
-            isResult = detector.getResults(results);
+            detector.RequestInfer(frame);
 
-            if (show && isResult)
+            if (show)
             {
                 use_time << "Detection Count:" << results.size() << "  Total Use Time:" << total_use_time << "ms";
 
                 //if (!next_frame.empty())
                 //    frame = next_frame;
 
-                DrawObjectBound(frame, results, labels);
+                //DrawObjectBound(frame, results, labels);
                
-                cv::putText(frame, use_time.str(), cv::Point(10, 25), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 0, 0), 2);
-                cv::imshow(title.str(), frame);
+                //cv::putText(frame, use_time.str(), cv::Point(10, 25), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 0, 0), 2);
+                //cv::imshow(title.str(), frame);
             }
             else
             {
-                use_time << std::setprecision(3) << std::boolalpha << "Result:" << isResult << "    Total Use Time:" << total_use_time << "ms";
+                //use_time << std::setprecision(3) << std::boolalpha << "Result:" << isResult << "    Total Use Time:" << total_use_time << "ms";
             }
             std::cout << "\33[2K\r[ INFO] " << use_time.str();
 
@@ -214,7 +217,7 @@ int main(int argc, char** argv)
             //detector.request(next_frame);
 
             t1 = std::chrono::high_resolution_clock::now();
-            total_use_time = std::chrono::duration_cast<ms>(t1 - t0).count();
+            total_use_time = detector.GetInferUseTime();// std::chrono::duration_cast<ms>(t1 - t0).count();
             delay = WaitKeyDelay - total_use_time;
             if (delay <= 0) delay = 1;
 
