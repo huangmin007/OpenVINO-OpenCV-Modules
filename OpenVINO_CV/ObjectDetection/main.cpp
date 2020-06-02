@@ -8,6 +8,7 @@
 #include "static_functions.hpp"
 #include "input_source.hpp"
 
+#define USE_SHARED_BLOB  true
 
 using namespace space;
 
@@ -167,7 +168,9 @@ int main(int argc, char** argv)
         std::map<std::string, std::string> model = ParseArgsForModel(args.get<std::string>("model"));
 
         inputSource.read(frame);
-        //detector.ReshapeInput(frame);
+#if USE_SHARED_BLOB
+        detector.ReshapeInput(frame);
+#endif
 
         std::vector<ObjectDetection::Result> results;
         std::stringstream title;
@@ -186,26 +189,11 @@ int main(int argc, char** argv)
         {
             if (!IsRunning) break;
             t0 = std::chrono::high_resolution_clock::now();
-
-            use_time.str(""); 
+#if !USE_SHARED_BLOB
             detector.RequestInfer(frame);
-
-            if (show)
-            {
-                use_time << "Detection Count:" << results.size() << "  Total Use Time:" << total_use_time << "ms";
-
-                //if (!next_frame.empty())
-                //    frame = next_frame;
-
-                //DrawObjectBound(frame, results, labels);
-               
-                //cv::putText(frame, use_time.str(), cv::Point(10, 25), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 0, 0), 2);
-                //cv::imshow(title.str(), frame);
-            }
-            else
-            {
-                //use_time << std::setprecision(3) << std::boolalpha << "Result:" << isResult << "    Total Use Time:" << total_use_time << "ms";
-            }
+#endif
+            use_time.str("");             
+            use_time << "Infer Use Time:" << total_use_time << "ms";
             std::cout << "\33[2K\r[ INFO] " << use_time.str();
 
             if (!inputSource.read(frame))
@@ -214,10 +202,9 @@ int main(int argc, char** argv)
                 Sleep(15);
                 continue;
             }
-            //detector.request(next_frame);
 
             t1 = std::chrono::high_resolution_clock::now();
-            total_use_time = detector.GetInferUseTime();// std::chrono::duration_cast<ms>(t1 - t0).count();
+            total_use_time = detector.GetInferUseTime();    //std::chrono::duration_cast<ms>(t1 - t0).count();
             delay = WaitKeyDelay - total_use_time;
             if (delay <= 0) delay = 1;
 

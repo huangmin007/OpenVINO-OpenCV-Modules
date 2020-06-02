@@ -24,7 +24,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ObjectDetection", "ObjectDe
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OpenPoseDetection", "OpenPoseDetection\OpenPoseDetection.vcxproj", "{AF67CED8-5D7B-434B-A438-F27E7A557EBB}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "InstanceSegmentation", "InstanceSegmentation\InstanceSegmentation.vcxproj", "{7DC57BBC-51FF-4859-BE33-D8A248F8C6AF}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ObjectSegmentation", "ObjectSegmentation\ObjectSegmentation.vcxproj", "{7DC57BBC-51FF-4859-BE33-D8A248F8C6AF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

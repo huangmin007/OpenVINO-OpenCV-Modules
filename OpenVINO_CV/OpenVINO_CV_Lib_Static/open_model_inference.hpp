@@ -10,7 +10,7 @@
 namespace space
 {
 	/// <summary>
-	/// 开放模型推断基类，基于图像为输入源，异步推断
+	/// 开放模型推断基类，基于图像为输入源，异步推断，输出层内存映射共享
 	/// <para>基本默认只创建了一个 InferRequest 对象，子类可以自已创建多个</para>
 	/// </summary>
 	class OpenModelInferBase
@@ -22,17 +22,16 @@ namespace space
 		/// <param name="is_debug"></param>
 		/// <returns></returns>
 		OpenModelInferBase(bool is_debug = true);
+
 		/// <summary>
 		/// 开放模型推断构造函数
 		/// </summary>
 		/// <param name="output_layer_names">需要指定的输出层名称，该参数用于有多层输出的网络</param>
-		/// <param name="is_mapping_output">是否将指定的输出层数据映射到共享内存；还是手动拷贝，手动拷贝是需要在子类里面实现的</param>
 		/// <param name="is_debug"></param>
 		/// <returns></returns>
-		OpenModelInferBase(const std::vector<std::string> &output_layer_names, bool is_mapping_output = true, bool is_debug = true);
+		OpenModelInferBase(const std::vector<std::string> &output_layer_names, bool is_debug = true);
 		~OpenModelInferBase();
 
-		
 		/// <summary>
 		/// 配置网络模型
 		/// </summary>
@@ -75,8 +74,6 @@ namespace space
 		/// </summary>
 		virtual void ConfigNetworkIO();
 
-		
-
 		/// <summary>
 		/// 异步推断完成回调函数
 		/// </summary>
@@ -85,7 +82,7 @@ namespace space
 		/// virtual void CompletionCallback(InferenceEngine::IInferRequest::Ptr request, InferenceEngine::StatusCode code);
 
 		/// <summary>
-		/// 解析输出层数据
+		/// 解析输出层数据，二次输出
 		/// </summary>
 		virtual void ParsingOutputData();
 
@@ -96,7 +93,7 @@ namespace space
 
 		bool is_debug;		//是否输出部份调试信息
 
-		//cnn 网络对象
+		//CNN 网络对象
 		InferenceEngine::CNNNetwork cnnNetwork;
 		//可执行网络对象
 		InferenceEngine::ExecutableNetwork execNetwork;
@@ -114,7 +111,6 @@ namespace space
 		//共享层内存文件句柄
 		std::vector<HANDLE> shared_output_handle;
 		//用于操作共享层的数据，共享层名称/内存映射视图指针
-		//std::map<std::string, LPVOID> shared_output_layers;
 		std::vector<std::pair<std::string, LPVOID>> shared_output_layers;
 		
 	private:
@@ -134,11 +130,8 @@ namespace space
 
 		//需要指定的输出层名称，该参数用于有多层输出的网络
 		std::vector<std::string> output_layers;
-		//是否将指定的输出层数据映射到共享内存；还是手动拷贝，手动拷贝是需要在子类里面实现的
-		bool is_mapping_output = false;
 
 		//用于创建共享层的信息，共享层名称/空间大小
-		//std::map<std::string, size_t> shared_layers_info;
 		std::vector<std::pair<std::string, size_t>> shared_layers_info;
 
 		//获取到推断结果所耗时间

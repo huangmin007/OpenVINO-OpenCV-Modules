@@ -46,6 +46,7 @@ namespace space
 		/// </summary>
 		/// <returns></returns>
 		InputSource();
+		InputSource(std::string shared);
 		~InputSource();
 
 

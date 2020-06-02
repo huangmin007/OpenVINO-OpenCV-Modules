@@ -8,8 +8,8 @@ namespace space
 	OpenModelInferBase::OpenModelInferBase(bool is_debug) :is_debug(is_debug)
 	{
 	}
-	OpenModelInferBase::OpenModelInferBase(const std::vector<std::string>& output_layer_names, bool is_mapping_output, bool is_debug)
-		: output_layers(output_layer_names), is_mapping_output(is_mapping_output), is_debug(is_debug)
+	OpenModelInferBase::OpenModelInferBase(const std::vector<std::string>& output_layer_names, bool is_debug)
+		: output_layers(output_layer_names), is_debug(is_debug)
 	{
 	}
 
@@ -169,7 +169,6 @@ namespace space
 	void OpenModelInferBase::CreateOutputShared()
 	{
 		LOG("INFO") << "正在创建/映射共享内存块 ... " << std::endl;
-		bool create_mapping = is_mapping_output;
 		for (const auto& shared : shared_layers_info)
 		{
 			LPVOID pBuffer;
@@ -177,22 +176,18 @@ namespace space
 
 			if (CreateOnlyWriteMapFile(pMapFile, pBuffer, shared.second, shared.first.c_str()))
 			{
-				shared_output_layers.push_back({ shared.first , pBuffer});
+				shared_output_layers.push_back({ shared.first , pBuffer });
 
 				//将输出层映射到内存共享(有些输出层精度不一样，会出现“无法创建共享blob!blob类型不能用于存储当前精度的对象”)
 				//重新设置指定输出层 Blob, 将指定输出层数据指向为共享指针，实现该层数据共享
-				if (is_mapping_output)
+				try
 				{
-					try
-					{
-						//input->buffer().as<InferenceEngine::PrecisionTrait<InferenceEngine::Precision::U8>::value_type*>();
-						MemoryOutputMapping({ shared.first , pBuffer });
-					}
-					catch (const std::exception &ex)
-					{
-						create_mapping = false;
-						LOG("WARN") << "映射共享内存 [" << shared.first << "] 错误：" << ex.what() << std::endl;
-					}
+					//input->buffer().as<InferenceEngine::PrecisionTrait<InferenceEngine::Precision::U8>::value_type*>();
+					MemoryOutputMapping({ shared.first , pBuffer });
+				}
+				catch (const std::exception& ex)
+				{
+					LOG("WARN") << "映射共享内存 [" << shared.first << "] 错误：" << ex.what() << std::endl;
 				}
 			}
 			else
@@ -201,8 +196,6 @@ namespace space
 				throw std::logic_error("共享内存块创建失败 ... ");
 			}
 		}
-
-		is_mapping_output = create_mapping;
 	}
 
 	void OpenModelInferBase::ReshapeInput(const cv::Mat& frame)
@@ -245,11 +238,8 @@ namespace space
 		requestPtr->SetBlob(inputsInfo.begin()->first, InferenceEngine::make_shared_blob<uint8_t>(tDesc, frame.data));
 
 		//重新映射内存
-		if (is_mapping_output)
-		{
-			LOG("INFO") << "重新内存映射网络输出层 ... " << std::endl;
-			for (auto& shared : shared_output_layers) MemoryOutputMapping(shared);
-		}
+		LOG("INFO") << "重新内存映射网络输出层 ... " << std::endl;
+		for (auto& shared : shared_output_layers) MemoryOutputMapping(shared);
 
 		//异步推断完成调用
 		requestPtr->SetCompletionCallback(
