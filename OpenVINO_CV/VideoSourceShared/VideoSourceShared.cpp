@@ -222,9 +222,17 @@ exit:
     if(isShow)cv::destroyAllWindows();
 
     //撤消地址空间内的视图
-    if (srcBuffer != NULL)   UnmapViewOfFile(srcBuffer);
+    if (srcBuffer != NULL)
+    {
+        UnmapViewOfFile(srcBuffer);
+        srcBuffer = NULL;
+    }
     //关闭共享文件句柄
-    if (srcMapFile != NULL)  CloseHandle(srcMapFile);
+    if (srcMapFile != NULL)
+    {
+        CloseHandle(srcMapFile);
+        srcMapFile = NULL;
+    }
 
     LOG("INFO") << "Exiting ..." << std::endl;
     Sleep(500);

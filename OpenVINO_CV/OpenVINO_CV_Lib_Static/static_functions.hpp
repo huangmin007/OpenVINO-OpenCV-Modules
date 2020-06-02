@@ -203,7 +203,7 @@ namespace space
         handle = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, size, (LPCSTR)name);
         LPVOID message = NULL;
         DWORD ErrorID = GetLastErrorFormatMessage(message);     //GetLastError ¼ì²é CreateFileMapping ×´Ì¬
-        LOG("INFO") << "CreateFileMapping [" << name << "]  GetLastError:" << ErrorID << "  Message: " << (char*)message;
+        LOG("INFO") << "CreateFileMapping [" << name << "]  GetLastError:" << ErrorID << "  Message:" << (char*)message;
 
         if (ErrorID != 0 || handle == NULL) return false;
 

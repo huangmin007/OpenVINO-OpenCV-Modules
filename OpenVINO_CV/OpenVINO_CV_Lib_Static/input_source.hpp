@@ -46,7 +46,13 @@ namespace space
 		/// </summary>
 		/// <returns></returns>
 		InputSource();
-		InputSource(std::string shared);
+		
+		/// <summary>
+		/// 是否共享 Video|Camera 源，源名称
+		/// </summary>
+		/// <param name="shared"></param>
+		/// <returns></returns>
+		InputSource(const std::string shared);
 		~InputSource();
 
 
@@ -79,7 +85,6 @@ namespace space
 		/// <returns>读取成功返回 true，否则返回 false</returns>
 		bool read(cv::Mat& frame, size_t& frame_id);
 
-
 		/// <summary>
 		/// 获取当前输入源类型
 		/// </summary>
@@ -101,7 +106,6 @@ namespace space
 		/// <returns></returns>
 		bool set(int propId, double value);
 
-
 		/// <summary>
 		/// 释放并关闭输入源
 		/// </summary>
@@ -112,22 +116,21 @@ namespace space
 
 	private:
 		size_t lastFrameID = 0xFFFFFFFF;
-
-#if USE_COPY_INPUT_METHOD
-		VideoSourceData vsd_data;		//输入共享视频源头数据信息
-#else
 		VideoSourceData* vsd_data;		//输入共享视频源头数据信息
-#endif
 
-		HANDLE	pMapFile = NULL;		//用于共享内存源的文件句柄
-		PVOID	pBuffer = NULL;			//用于共享内存数据指针映射
-		std::string shared_name;		//读取共享内存数据的名称
+		HANDLE	input_map_file = NULL;		//用于共享内存源的文件句柄
+		LPVOID	input_buffer = NULL;		//用于共享内存数据指针映射
 
 		InputType type;					//输入源类型
 		bool isopen = false;			//输入源是否已经打开
 		cv::VideoCapture capture;		//用于视频源和相机源
 
+		HANDLE output_map_file;
+		LPVOID output_buffer;
+		std::string output_shared_name;
+
 		std::string video_url;
+
 	};
 };
 

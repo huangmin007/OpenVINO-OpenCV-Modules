@@ -146,7 +146,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="ObjectSegmentation.cpp" />
+    <ClCompile Include="main.cpp" />
     <ClCompile Include="object_segmentation.cpp" />
   </ItemGroup>
   <ItemGroup>

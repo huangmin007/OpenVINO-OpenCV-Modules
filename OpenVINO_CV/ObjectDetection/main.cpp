@@ -12,60 +12,6 @@
 
 using namespace space;
 
-/// <summary>
-/// 绘制检测对象的边界
-/// </summary>
-/// <param name="frame"></param>
-/// <param name="results"></param>
-/// <param name="labels"></param>
-void DrawObjectBound(cv::Mat frame, const std::vector<ObjectDetection::Result>& results, const std::vector<std::string> &labels)
-{
-    size_t length = results.size();
-    if (length <= 0) return;
-    
-    std::stringstream txt;
-    cv::Scalar border_color(0, 255, 0);
-
-    float scale = 0.2f;
-    int shift = 0;
-    int thickness = 2;
-    int lineType = cv::LINE_AA;
-
-    std::string label;
-    size_t label_length = labels.size();
-
-    for (const auto &result : results)
-    {
-        cv::Rect rect = ScaleRectangle(result.location);
-        cv::rectangle(frame, rect, border_color, 1);
-
-        cv::Point h_width = cv::Point(rect.width * scale, 0);   //水平宽度
-        cv::Point v_height = cv::Point(0, rect.height * scale); //垂直高度
-
-        cv::Point left_top(rect.x, rect.y);
-        cv::line(frame, left_top, left_top + h_width, border_color, thickness, lineType, shift);     //-
-        cv::line(frame, left_top, left_top + v_height, border_color, thickness, lineType, shift);    //|
-
-        cv::Point left_bottom(rect.x, rect.y + rect.width - 1);
-        cv::line(frame, left_bottom, left_bottom + h_width, border_color, thickness, lineType, shift);       //-
-        cv::line(frame, left_bottom, left_bottom - v_height, border_color, thickness, lineType, shift);      //|
-
-        cv::Point right_top(rect.x + rect.width - 1, rect.y);
-        cv::line(frame, right_top, right_top - h_width, border_color, thickness, lineType, shift);   //-
-        cv::line(frame, right_top, right_top + v_height, border_color, thickness, lineType, shift);  //|
-
-        cv::Point right_bottom(rect.x + rect.width - 1, rect.y + rect.height - 1);
-        cv::line(frame, right_bottom, right_bottom - h_width, border_color, thickness, lineType, shift);   //-
-        cv::line(frame, right_bottom, right_bottom - v_height, border_color, thickness, lineType, shift);  //|
-
-        txt.str("");
-        label = (label_length <= 0 || result.label < 0 || result.label >= label_length) ? 
-            std::to_string(result.label) : labels[result.label];
-        txt << std::setprecision(3) << "Label:" << label << "  Conf:" << result.confidence;
-        cv::putText(frame, txt.str(), cv::Point(left_top.x, left_top.y - 5), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 0, 0), 1);
-    }
-}
-
 int main(int argc, char** argv)
 {
     if (SetConsoleCtrlHandler((PHANDLER_ROUTINE)space::CloseHandlerRoutine, TRUE) == FALSE)
@@ -150,7 +96,7 @@ int main(int argc, char** argv)
 #pragma endregion
 
     cv::Mat frame;
-    InputSource inputSource;
+    InputSource inputSource("od_source.bin");
     if (!inputSource.open(args.get<std::string>("input")))
     {
         inputSource.release();
@@ -161,7 +107,7 @@ int main(int argc, char** argv)
     try
     {
         InferenceEngine::Core ie;
-        ObjectDetection detector(output_layer_names, true, show);
+        ObjectDetection detector(output_layer_names, show);
         detector.Configuration(ie, args.get<std::string>("model"));
         detector.SetParameters(conf, labels);
 
@@ -174,14 +120,15 @@ int main(int argc, char** argv)
 
         std::vector<ObjectDetection::Result> results;
         std::stringstream title;
-        title << "Object Detection [" << model["full"] << "]";
+        title << "[Source] Object Detection [" << model["full"] << "]";
 
         bool isResult = false;
         std::stringstream txt;
         std::stringstream use_time;
 
         int delay = WaitKeyDelay;
-        double total_use_time = 0.0f;
+        double infer_use_time = 0.0f;
+        double frame_use_time = 0.0f;
         auto t0 = std::chrono::high_resolution_clock::now();
         auto t1 = std::chrono::high_resolution_clock::now();
 
@@ -193,7 +140,7 @@ int main(int argc, char** argv)
             detector.RequestInfer(frame);
 #endif
             use_time.str("");             
-            use_time << "Infer Use Time:" << total_use_time << "ms";
+            use_time << "Infer Use Time:" << infer_use_time <<  "/" << frame_use_time << "ms";
             std::cout << "\33[2K\r[ INFO] " << use_time.str();
 
             if (!inputSource.read(frame))
@@ -203,9 +150,16 @@ int main(int argc, char** argv)
                 continue;
             }
 
+            if (show)
+            {
+                cv::imshow(title.str(), frame);
+            }
+
             t1 = std::chrono::high_resolution_clock::now();
-            total_use_time = detector.GetInferUseTime();    //std::chrono::duration_cast<ms>(t1 - t0).count();
-            delay = WaitKeyDelay - total_use_time;
+            infer_use_time = detector.GetInferUseTime();    
+            frame_use_time = std::chrono::duration_cast<ms>(t1 - t0).count();
+
+            delay = WaitKeyDelay - frame_use_time;
             if (delay <= 0) delay = 1;
 
             cv::waitKey(delay);

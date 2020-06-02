@@ -68,7 +68,15 @@ namespace space
 		/// <returns></returns>
 		double GetInferUseTime();
 
+		/// <summary>
+		/// 获取精度所对应的数据类型字节大小
+		/// </summary>
+		/// <param name="precision"></param>
+		/// <returns></returns>
+		static size_t GetPrecisionOfSize(const InferenceEngine::Precision& precision);
+
 	protected:
+
 		/// <summary>
 		/// 配置网络输入/输出，是用于子类做其它配置的
 		/// </summary>
@@ -82,7 +90,7 @@ namespace space
 		/// virtual void CompletionCallback(InferenceEngine::IInferRequest::Ptr request, InferenceEngine::StatusCode code);
 
 		/// <summary>
-		/// 解析输出层数据，二次输出
+		/// 解析输出层数据，可能是二次输出，或是调试显示输出
 		/// </summary>
 		virtual void ParsingOutputData();
 
@@ -92,6 +100,7 @@ namespace space
 		virtual void UpdateDebugShow() = 0;
 
 		bool is_debug;		//是否输出部份调试信息
+		std::stringstream debug_title;	//调试输出窗口标题
 
 		//CNN 网络对象
 		InferenceEngine::CNNNetwork cnnNetwork;

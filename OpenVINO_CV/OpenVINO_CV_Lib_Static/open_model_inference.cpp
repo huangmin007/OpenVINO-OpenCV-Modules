@@ -55,6 +55,36 @@ namespace space
 		is_configuration = true;
 	}
 
+	size_t OpenModelInferBase::GetPrecisionOfSize(const InferenceEngine::Precision &precision)
+	{
+		switch (precision)
+		{
+		case InferenceEngine::Precision::U64:	//uint64_t
+		case InferenceEngine::Precision::I64:	//int64_t
+			return sizeof(uint64_t);
+
+		case InferenceEngine::Precision::FP32:	//float
+			return sizeof(float);
+
+		case InferenceEngine::Precision::I32:	//int32_t
+			return sizeof(int32_t);
+
+		case InferenceEngine::Precision::U16:	//uint16_t
+		case InferenceEngine::Precision::I16:	//int16_t
+		case InferenceEngine::Precision::Q78:	//int16_t, uint16_t
+		case InferenceEngine::Precision::FP16:	//int16_t, uint16_t	
+			return sizeof(uint16_t);
+
+		case InferenceEngine::Precision::U8:	//uint8_t
+		case InferenceEngine::Precision::BOOL:	//uint8_t
+		case InferenceEngine::Precision::I8:	//int8_t
+		case InferenceEngine::Precision::BIN:	//int8_t, uint8_t
+			return sizeof(uint8_t);
+		}
+
+		return sizeof(uint8_t);
+	}
+
 	void OpenModelInferBase::ConfigNetworkIO()
 	{
 		LOG("INFO") << "\t配置网络输入  ... " << std::endl;
@@ -73,8 +103,13 @@ namespace space
 		}
 
 		//默认支持一层输入，子类可以更改为多层输入
+		//多层输入以输入层名.bin文件指向
+		//那bin的数据类型，精度怎么解释呢？
 		if (inputsInfo.size() != 1)
-			THROW_IE_EXCEPTION << "当前模块只支持一个网络层的输入 ... ";
+		{
+			LOG("WARN") << "当前模块只支持一个网络层的输入 ... " << std::endl;
+			throw std::logic_error("当前模块只支持一个网络层的输入 ... ");
+		}
 
 
 		LOG("INFO") << "\t配置网络输出  ... " << std::endl;
@@ -84,13 +119,14 @@ namespace space
 		if (outputsInfo.size() == 1)
 		{
 			output_layers.push_back(outputsInfo.begin()->first);
+			int size = GetPrecisionOfSize(outputsInfo.begin()->second->getTensorDesc().getPrecision());
 			InferenceEngine::SizeVector outputDims = outputsInfo.begin()->second->getTensorDesc().getDims();
 
 			//将输出层添加到共享
 			size_t shared_size = 1;
 			for (auto& v : outputDims) shared_size *= v;
 			shared_layers_info.clear();
-			shared_layers_info.push_back({ outputsInfo.begin()->first, shared_size * 4 });
+			shared_layers_info.push_back({ outputsInfo.begin()->first, shared_size * size });
 		}
 		
 		//print outputs info
@@ -114,6 +150,7 @@ namespace space
 			//将输出层添加到共享
 			for (auto& output : outputsInfo)
 			{
+				int size = GetPrecisionOfSize(output.second->getTensorDesc().getPrecision());
 				InferenceEngine::SizeVector outputDims = output.second->getTensorDesc().getDims();
 				std::vector<std::string>::iterator it = find(output_layers.begin(), output_layers.end(), output.first);
 
@@ -121,10 +158,19 @@ namespace space
 				{
 					size_t shared_size = 1;
 					for (auto& v : outputDims) shared_size *= v;
-					shared_layers_info.push_back({ output.first, shared_size * 4 });
+					shared_layers_info.push_back({ output.first, shared_size * size });
 				}
 			}
 		}
+
+
+		//输出调试标题
+		InferenceEngine::SizeVector outputDims = outputsInfo.find(shared_layers_info.begin()->first)->second->getTensorDesc().getDims();
+		std::stringstream shape; shape << "[";
+		for(int i = 0; i < outputDims.size(); i ++)
+			shape << outputDims[i] << (i != outputDims.size() - 1 ? "x" : "]");
+		debug_title.str("");
+		debug_title << "[" << cnnNetwork.getName() << "] Output Size:" << outputsInfo.size() << "  Name:[" << shared_layers_info.begin()->first << "]  Shape:" << shape.str() << std::endl;
 	}
 
 	void OpenModelInferBase::MemoryOutputMapping(const std::pair<std::string, LPVOID> &shared)
@@ -204,6 +250,8 @@ namespace space
 
 		if (!is_configuration)
 			throw std::logic_error("未配置网络对象，不可操作 ...");
+		if(frame.empty())
+			throw std::logic_error("输入图像帧不能为空帧对象 ... ");
 		if (frame.type() != CV_8UC3)
 			throw std::logic_error("输入图像帧不支持 CV_8UC3 类型 ... ");
 
@@ -266,6 +314,8 @@ namespace space
 	{
 		if (!is_configuration)
 			throw std::logic_error("未配置网络对象，不可操作 ...");
+		if (frame.empty())
+			throw std::logic_error("输入图像帧不能为空帧对象 ... ");
 		if (is_reshape)
 			throw std::logic_error("已重设过输入尺寸参数 ResizeInput，不可操作 ...");
 
@@ -298,19 +348,6 @@ namespace space
 
 	void OpenModelInferBase::ParsingOutputData()
 	{
-		//没有映射，需手动拷贝
-		if (!is_mapping_output)
-		{
-			for (const auto& shared : shared_output_layers)
-			{
-				const uint8_t* buffer = requestPtr->GetBlob(shared.first)->buffer().as<uint8_t*>();
-				
-				if (buffer != (uint8_t*)shared.second)
-					std::copy(buffer, buffer + requestPtr->GetBlob(shared.first)->size(), (uint8_t*)shared.second);
-				else
-					LOG("WARN") << "内存块地址一致，不做拷贝 ... " << std::endl;
-			}
-		}
 		if (is_debug) UpdateDebugShow();
 	}
 

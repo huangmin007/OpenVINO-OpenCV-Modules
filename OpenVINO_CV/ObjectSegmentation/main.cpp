@@ -11,6 +11,9 @@
 using namespace space;
 using namespace InferenceEngine;
 
+#define USE_SHARED_BLOB  true
+
+
 #if 1
 int main(int argc, char **argv)
 {
@@ -73,7 +76,7 @@ int main(int argc, char **argv)
 #pragma endregion
 
     cv::Mat frame;
-    InputSource inputSource;
+    InputSource inputSource("os_source.bin");
     if (!inputSource.open(args.get<std::string>("input")))
     {
         inputSource.release();
@@ -85,19 +88,20 @@ int main(int argc, char **argv)
     {
         InferenceEngine::Core ie;
         ObjectSegmentation detector(output_layer_names, show);
-        detector.config(ie, args.get<std::string>("model"), true);
+        detector.Configuration(ie, args.get<std::string>("model"));
 
         inputSource.read(frame);
-        detector.start(frame);
-
+#if USE_SHARED_BLOB
+        detector.ReshapeInput(frame);
+#endif
         std::stringstream title;
-        title << "Object Segmentation [" << model["full"] << "]";
+        title << "[Source] Object Segmentation [" << model["full"] << "]";
 
         std::stringstream use_time;
 
         int delay = 40;
         double infer_use_time = 0.0f;
-        double total_use_time = 0.0f;
+        double frame_use_time = 0.0f;
         auto t0 = std::chrono::high_resolution_clock::now();
         auto t1 = std::chrono::high_resolution_clock::now();
 
@@ -106,6 +110,15 @@ int main(int argc, char **argv)
             if (!IsRunning) break;
             t0 = std::chrono::high_resolution_clock::now();
 
+#if !USE_SHARED_BLOB
+            detector.RequestInfer(frame);
+#endif
+
+            infer_use_time = detector.GetInferUseTime();
+
+            use_time.str("");
+            use_time << "Frame/Inference Use Time:" << frame_use_time << "/" << infer_use_time << "ms";
+
             if (!inputSource.read(frame))
             {
                 LOG("WARN") << "读取数据帧失败，等待读取下一帧 ... " << std::endl;
@@ -113,21 +126,16 @@ int main(int argc, char **argv)
                 continue;
             }
 
-            infer_use_time = detector.getUseTime();
-
-            use_time.str("");
-            use_time << "Total/Inference Use Time:" << total_use_time << "/" << infer_use_time << "ms";
-
             if (show)
             {
-                cv::putText(frame, use_time.str(), cv::Point(10, 25), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 0, 0), 2);
+                //cv::putText(frame, use_time.str(), cv::Point(10, 25), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 0, 0), 2);
                 cv::imshow(title.str(), frame);
             }
             std::cout << "\33[2K\r[ INFO] " << use_time.str();
 
             t1 = std::chrono::high_resolution_clock::now();
-            total_use_time = std::chrono::duration_cast<ms>(t1 - t0).count();
-            delay = 40.0f - total_use_time;
+            frame_use_time = std::chrono::duration_cast<ms>(t1 - t0).count();
+            delay = 40.0f - frame_use_time;
             if (delay <= 0) delay = 1;
 
             cv::waitKey(delay);

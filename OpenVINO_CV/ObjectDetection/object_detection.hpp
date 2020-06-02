@@ -37,10 +37,9 @@ namespace space
 		/// 对象检测构造函数
 		/// </summary>
 		/// <param name="output_layers_name">多层的网络输出名称</param>
-		/// <param name="is_mapping_output"是否将指定的输出层数据映射到共享内存</param>
 		/// <param name="is_debug"></param>
 		/// <returns></returns>
-		ObjectDetection(const std::vector<std::string> &output_layers_name, bool is_mapping_output = true, bool is_debug = true);
+		ObjectDetection(const std::vector<std::string> &output_layers_name, bool is_debug = true);
 		~ObjectDetection();
 
 		/// <summary>
@@ -51,7 +50,6 @@ namespace space
 		void SetParameters(double confidence_threshold, const std::vector<std::string> labels);
 
 	protected:
-		void ConfigNetworkIO() override;
 		void UpdateDebugShow() override;
 
 	private:
@@ -64,8 +62,6 @@ namespace space
 		void DrawObjectBound(cv::Mat frame, const std::vector<ObjectDetection::Result>& results, const std::vector<std::string>& labels);
 		
 		cv::Mat debug_frame;
-		std::stringstream debug_title;
-
 		std::vector<std::string> labels;
 		double confidence_threshold = 0.5f;
 	};

@@ -10,19 +10,10 @@ namespace space
 	ObjectDetection::ObjectDetection(bool is_debug)
 		:OpenModelInferBase(is_debug), confidence_threshold(0.5) {};
 	
-	ObjectDetection::ObjectDetection(const std::vector<std::string>& output_layers_name, bool is_mapping_output, bool is_debug)
-		:OpenModelInferBase(output_layers_name, is_mapping_output, is_debug), confidence_threshold(0.5){};
+	ObjectDetection::ObjectDetection(const std::vector<std::string>& output_layers_name, bool is_debug)
+		:OpenModelInferBase(output_layers_name, is_debug), confidence_threshold(0.5){};
 	
 	ObjectDetection::~ObjectDetection(){};
-
-	void ObjectDetection::ConfigNetworkIO()
-	{
-		OpenModelInferBase::ConfigNetworkIO();
-
-		InferenceEngine::SizeVector sizeVector = inputsInfo.begin()->second->getTensorDesc().getDims();
-		debug_title.str("");
-		debug_title << "Input Name:[" << inputsInfo.begin()->first << "]  Shape:[" << sizeVector[0] << "x" << sizeVector[1] << "x" << sizeVector[2] << "x" << sizeVector[3] << "]";
-	}
 
 	void ObjectDetection::SetParameters(double confidence_threshold, const std::vector<std::string> labels)
 	{
@@ -128,7 +119,7 @@ namespace space
 				DrawObjectBound(debug_frame, results, labels);
 
 				std::stringstream use_time;
-				use_time << "Detection Count:" << results.size() << "  Total Use Time:" << GetInferUseTime() << "ms";
+				use_time << "Detection Count:" << results.size() << "  Infer Use Time:" << GetInferUseTime() << "ms";
 				cv::putText(debug_frame, use_time.str(), cv::Point(10, 25), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 0, 0), 2);
 
 				cv::imshow(debug_title.str(), debug_frame);
@@ -185,7 +176,7 @@ namespace space
 				DrawObjectBound(debug_frame, results, labels);
 
 				std::stringstream use_time;
-				use_time << "Detection Count:" << results.size() << "  Total Use Time:" << GetInferUseTime() << "ms";
+				use_time << "Detection Count:" << results.size() << "  Infer Use Time:" << GetInferUseTime() << "ms";
 				cv::putText(debug_frame, use_time.str(), cv::Point(10, 25), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 0, 0), 2);
 
 				cv::imshow(debug_title.str(), debug_frame);
