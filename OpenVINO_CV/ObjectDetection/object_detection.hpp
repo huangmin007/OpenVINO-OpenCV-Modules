@@ -6,7 +6,8 @@
 #include <opencv2/opencv.hpp>
 #include <inference_engine.hpp>
 
-#include "open_model_inference.hpp"
+#include "open_model_infer.hpp"
+//#include "open_model_multi_infer.hpp"
 
 
 namespace space
@@ -31,11 +32,6 @@ namespace space
 		/// <summary>
 		/// 对象检测构造函数
 		/// </summary>
-		/// <param name="is_debug">是否运行调试输出状态</param>
-		ObjectDetection(bool is_debug = true);
-		/// <summary>
-		/// 对象检测构造函数
-		/// </summary>
 		/// <param name="output_layers_name">多层的网络输出名称</param>
 		/// <param name="is_debug"></param>
 		/// <returns></returns>
@@ -50,6 +46,7 @@ namespace space
 		void SetParameters(double confidence_threshold, const std::vector<std::string> labels);
 
 	protected:
+		void ParsingOutputData(InferenceEngine::IInferRequest::Ptr request, InferenceEngine::StatusCode status) override;
 		void UpdateDebugShow() override;
 
 	private:
@@ -64,6 +61,8 @@ namespace space
 		cv::Mat debug_frame;
 		std::vector<std::string> labels;
 		double confidence_threshold = 0.5f;
+
+		std::vector<ObjectDetection::Result> results;
 	};
 
 #pragma endregion

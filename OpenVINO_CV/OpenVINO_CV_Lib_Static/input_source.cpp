@@ -211,6 +211,7 @@ namespace space
 			if (frame.empty() && output_buffer != NULL)
 			{
 				frame.create(vsd_data->height, vsd_data->width, CV_8UC3);
+
 				vsd_data = (VideoSourceData*)output_buffer;
 				frame.data = (uint8_t*)output_buffer + VSD_SIZE;
 			}

@@ -15,8 +15,22 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="HumanPoseEstimation3D.cpp">
+    <ClCompile Include="main.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="peak.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="human_pose_detection.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="peak.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="human_pose_detection.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

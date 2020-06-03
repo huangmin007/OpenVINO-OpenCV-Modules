@@ -613,4 +613,38 @@ namespace space
         return new_rect;
     }
 
+    /// <summary>
+    /// 获取精度所对应的数据类型字节大小
+    /// </summary>
+    /// <param name="precision"></param>
+    /// <returns></returns>
+    inline size_t GetPrecisionOfSize(const InferenceEngine::Precision& precision)
+    {
+        switch (precision)
+        {
+        case InferenceEngine::Precision::U64:	//uint64_t
+        case InferenceEngine::Precision::I64:	//int64_t
+            return sizeof(uint64_t);
+
+        case InferenceEngine::Precision::FP32:	//float
+            return sizeof(float);
+
+        case InferenceEngine::Precision::I32:	//int32_t
+            return sizeof(int32_t);
+
+        case InferenceEngine::Precision::U16:	//uint16_t
+        case InferenceEngine::Precision::I16:	//int16_t
+        case InferenceEngine::Precision::Q78:	//int16_t, uint16_t
+        case InferenceEngine::Precision::FP16:	//int16_t, uint16_t	
+            return sizeof(uint16_t);
+
+        case InferenceEngine::Precision::U8:	//uint8_t
+        case InferenceEngine::Precision::BOOL:	//uint8_t
+        case InferenceEngine::Precision::I8:	//int8_t
+        case InferenceEngine::Precision::BIN:	//int8_t, uint8_t
+            return sizeof(uint8_t);
+        }
+
+        return sizeof(uint8_t);
+    }
 }

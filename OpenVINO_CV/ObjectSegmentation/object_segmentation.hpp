@@ -7,7 +7,7 @@
 #include <opencv2/opencv.hpp>
 #include <inference_engine.hpp>
 
-#include <open_model_inference.hpp>
+#include <open_model_infer.hpp>
 
 namespace space
 {
@@ -17,11 +17,6 @@ namespace space
 	class ObjectSegmentation:public OpenModelInferBase
 	{
 	public:
-		/// <summary>
-		/// 对象/场景/实例分割构造函数
-		/// </summary>
-		/// <param name="is_debug">是否运行调试输出状态</param>
-		ObjectSegmentation(bool is_debug = false);
 		/// <summary>
 		/// 对象/场景/实例分割构造函数
 		/// </summary>

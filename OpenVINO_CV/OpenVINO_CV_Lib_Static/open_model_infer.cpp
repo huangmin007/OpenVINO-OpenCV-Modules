@@ -1,13 +1,11 @@
 #include "pch.h"
 #include "static_functions.hpp"
-#include "open_model_inference.hpp"
+#include "open_model_infer.hpp"
 #include <typeinfo>
+#include <shared_mutex>
 
 namespace space
 {
-	OpenModelInferBase::OpenModelInferBase(bool is_debug) :is_debug(is_debug)
-	{
-	}
 	OpenModelInferBase::OpenModelInferBase(const std::vector<std::string>& output_layer_names, bool is_debug)
 		: output_layers(output_layer_names), is_debug(is_debug)
 	{
@@ -15,10 +13,18 @@ namespace space
 
 	OpenModelInferBase::~OpenModelInferBase()
 	{
+		timer.stop();
+
 		for (auto& shared : shared_output_layers)
+		{
 			UnmapViewOfFile(shared.second);
+			shared.second = NULL;
+		}
 		for (auto& handle : shared_output_handle)
+		{
 			CloseHandle(handle);
+			handle = NULL;
+		}
 
 		shared_output_handle.clear();
 		shared_output_layers.clear();
@@ -26,15 +32,14 @@ namespace space
 		LOG("INFO") << "OpenModelInferBase Dispose Shared ...." << std::endl;
 	}
 
-	void OpenModelInferBase::Configuration(InferenceEngine::Core& ie, const std::string& model_info)
+	void OpenModelInferBase::Configuration(InferenceEngine::Core& ie, const std::string& model_info, bool is_reshape)
 	{
 		std::map<std::string, std::string> model = ParseArgsForModel(model_info);
-		return Configuration(ie, model["path"], model["device"]);
+		return Configuration(ie, model["path"], model["device"], is_reshape);
 	}
-	void OpenModelInferBase::Configuration(InferenceEngine::Core& ie, const std::string& model_path, const std::string& device)
+	void OpenModelInferBase::Configuration(InferenceEngine::Core& ie, const std::string& model_path, const std::string& device, bool is_reshape)
 	{
-		this->ie = ie;
-		this->device = device;
+		this->is_reshape = is_reshape;
 		LOG("INFO") << "正在配置网络模型 ... " << std::endl;
 
 		LOG("INFO") << "\t读取 IR 文件: " << model_path << " [" << device << "]" << std::endl;
@@ -52,37 +57,40 @@ namespace space
 		//创建输出共享
 		CreateOutputShared();
 
+		//设置异步回调
+		typedef std::function<void(InferenceEngine::InferRequest, InferenceEngine::StatusCode)>		FCompletionCallback;
+		requestPtr->SetCompletionCallback<FCompletionCallback>((FCompletionCallback)
+			[&](InferenceEngine::IInferRequest::Ptr request, InferenceEngine::StatusCode code)
+			{
+				t1 = std::chrono::high_resolution_clock::now();
+
+				{
+					std::unique_lock<std::shared_mutex> lock(_time_mutex);
+					infer_use_time = std::chrono::duration_cast<ms>(t1 - t0).count();
+				}
+				{
+					std::unique_lock<std::shared_mutex> lock(_fps_mutex);
+					fps_count ++;
+				}
+
+				ParsingOutputData(request, code);
+
+				//循环再次启动异步推断
+				if (this->is_reshape)
+				{
+					requestPtr->StartAsync();
+					t0 = std::chrono::high_resolution_clock::now();
+				}
+			});
+
+		timer.start(1000, [&]
+			{
+				std::unique_lock<std::shared_mutex> lock(_fps_mutex);
+				fps = fps_count;
+				fps_count = 0;
+			});
+
 		is_configuration = true;
-	}
-
-	size_t OpenModelInferBase::GetPrecisionOfSize(const InferenceEngine::Precision &precision)
-	{
-		switch (precision)
-		{
-		case InferenceEngine::Precision::U64:	//uint64_t
-		case InferenceEngine::Precision::I64:	//int64_t
-			return sizeof(uint64_t);
-
-		case InferenceEngine::Precision::FP32:	//float
-			return sizeof(float);
-
-		case InferenceEngine::Precision::I32:	//int32_t
-			return sizeof(int32_t);
-
-		case InferenceEngine::Precision::U16:	//uint16_t
-		case InferenceEngine::Precision::I16:	//int16_t
-		case InferenceEngine::Precision::Q78:	//int16_t, uint16_t
-		case InferenceEngine::Precision::FP16:	//int16_t, uint16_t	
-			return sizeof(uint16_t);
-
-		case InferenceEngine::Precision::U8:	//uint8_t
-		case InferenceEngine::Precision::BOOL:	//uint8_t
-		case InferenceEngine::Precision::I8:	//int8_t
-		case InferenceEngine::Precision::BIN:	//int8_t, uint8_t
-			return sizeof(uint8_t);
-		}
-
-		return sizeof(uint8_t);
 	}
 
 	void OpenModelInferBase::ConfigNetworkIO()
@@ -90,6 +98,11 @@ namespace space
 		LOG("INFO") << "\t配置网络输入  ... " << std::endl;
 		inputsInfo = cnnNetwork.getInputsInfo();
 		inputsInfo.begin()->second->setPrecision(InferenceEngine::Precision::U8);
+		if (is_reshape)
+		{
+			inputsInfo.begin()->second->setLayout(InferenceEngine::Layout::NHWC);
+			inputsInfo.begin()->second->getPreProcess().setResizeAlgorithm(InferenceEngine::ResizeAlgorithm::RESIZE_BILINEAR);
+		}
 
 		//print inputs info
 		for (const auto& input : inputsInfo)
@@ -244,6 +257,7 @@ namespace space
 		}
 	}
 
+#if T
 	void OpenModelInferBase::ReshapeInput(const cv::Mat& frame)
 	{
 		LOG("INFO") << "重新设置输入层参数 ... " << std::endl;
@@ -290,10 +304,18 @@ namespace space
 		for (auto& shared : shared_output_layers) MemoryOutputMapping(shared);
 
 		//异步推断完成调用
-		requestPtr->SetCompletionCallback(
-			[&] {
+		requestPtr->SetCompletionCallback([&]
+			{
 				t1 = std::chrono::high_resolution_clock::now();
-				infer_use_time = std::chrono::duration_cast<ms>(t1 - t0).count();
+
+				{				
+					std::unique_lock<std::shared_mutex> lock(_time_mutex);
+					infer_use_time = std::chrono::duration_cast<ms>(t1 - t0).count();
+				}
+				{
+					std::unique_lock<std::shared_mutex> lock(_fps_mutex);
+					result_count++;
+				}
 
 				//解析数据
 				ParsingOutputData();
@@ -303,52 +325,64 @@ namespace space
 				t0 = std::chrono::high_resolution_clock::now();
 			});
 
+		timer.start(1000, [&]
+			{
+				std::unique_lock<std::shared_mutex> lock(_fps_mutex);
+				fps = result_count;
+				result_count = 0;
+			});
+
 		//开始异步推断
+		is_reshape = true;
 		requestPtr->StartAsync();
 		t0 = std::chrono::high_resolution_clock::now();
-
-		is_reshape = true;
 	}
+#endif
 
 	void OpenModelInferBase::RequestInfer(const cv::Mat& frame)
 	{
 		if (!is_configuration)
 			throw std::logic_error("未配置网络对象，不可操作 ...");
-		if (frame.empty())
-			throw std::logic_error("输入图像帧不能为空帧对象 ... ");
-		if (is_reshape)
-			throw std::logic_error("已重设过输入尺寸参数 ResizeInput，不可操作 ...");
+		if (frame.empty() || frame.type() != CV_8UC3)
+			throw std::logic_error("输入图像帧不能为空帧对象，CV_8UC3 类型 ... ");
 
 		frame_ptr = frame;
+		static bool is_config_reshape = false;
+
+		if (is_reshape && !is_config_reshape)
+		{
+			is_config_reshape = true;
+
+			size_t width = frame.cols;
+			size_t height = frame.rows;
+			size_t channels = frame.channels();
+
+			size_t strideH = frame.step.buf[0];
+			size_t strideW = frame.step.buf[1];
+
+			bool is_dense = strideW == channels && strideH == channels * width;
+			if (!is_dense) throw std::logic_error("输入的图像帧不支持转换 ... ");
+			
+			//重新设置输入层 Blob，将输入图像内存数据指针共享给输入层，做实时或异步推断
+			//输入为图像原始尺寸，其实是会存在问题的，如果源图尺寸很大，那处理时间会更长
+			InferenceEngine::TensorDesc inputTensorDesc = inputsInfo.begin()->second->getTensorDesc();
+			InferenceEngine::TensorDesc tDesc(inputTensorDesc.getPrecision(), { 1, channels, height, width }, inputTensorDesc.getLayout());
+			requestPtr->SetBlob(inputsInfo.begin()->first, InferenceEngine::make_shared_blob<uint8_t>(tDesc, frame.data));
+
+			requestPtr->StartAsync();
+			t0 = std::chrono::high_resolution_clock::now();
+			return;
+		}
+
+		if (is_reshape) return;
+
 		InferenceEngine::Blob::Ptr inputBlob = requestPtr->GetBlob(inputsInfo.begin()->first);
 		MatU8ToBlob<uint8_t>(frame, inputBlob);
-
-		//设置异步回调
-		static bool is_async_callback = false;
-		if (!is_async_callback)
-		{
-			requestPtr->SetCompletionCallback(
-				[&] {
-					t1 = std::chrono::high_resolution_clock::now();
-					infer_use_time = std::chrono::duration_cast<ms>(t1 - t0).count();
-
-					ParsingOutputData();
-				});
-
-			is_async_callback = true;
-		}
 
 		//开始异步推断
 		requestPtr->StartAsync();
 		t0 = std::chrono::high_resolution_clock::now();
 		requestPtr->Wait(InferenceEngine::IInferRequest::WaitMode::RESULT_READY);
-	}
-
-	double OpenModelInferBase::GetInferUseTime(){	return infer_use_time;	}
-
-	void OpenModelInferBase::ParsingOutputData()
-	{
-		if (is_debug) UpdateDebugShow();
 	}
 
 }

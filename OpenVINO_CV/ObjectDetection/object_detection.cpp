@@ -7,9 +7,6 @@
 
 namespace space
 {
-	ObjectDetection::ObjectDetection(bool is_debug)
-		:OpenModelInferBase(is_debug), confidence_threshold(0.5) {};
-	
 	ObjectDetection::ObjectDetection(const std::vector<std::string>& output_layers_name, bool is_debug)
 		:OpenModelInferBase(output_layers_name, is_debug), confidence_threshold(0.5){};
 	
@@ -75,15 +72,19 @@ namespace space
 		}
 	}
 
-	void ObjectDetection::UpdateDebugShow()
+	void ObjectDetection::ParsingOutputData(InferenceEngine::IInferRequest::Ptr request, InferenceEngine::StatusCode status)
 	{
 		static InferenceEngine::SizeVector outputShape = outputsInfo.find(shared_output_layers.begin()->first)->second->getTensorDesc().getDims();
 
 		//单层输出
 		if (shared_output_layers.size() == 1)
 		{
-			const float* buffer = (float*)shared_output_layers.begin()->second;
+			//const float* buffer = (float*)shared_output_layers.begin()->second;
 			//const float* buffer = requestPtr->GetBlob(shared_output_layers.begin()->first)->buffer().as<float*>();
+			
+			InferenceEngine::Blob::Ptr data;
+			request->GetBlob(shared_output_layers.begin()->first.c_str(), data, 0);
+			const float* buffer = data->buffer().as<float*>();
 
 			//[1x1xNx7] FP32
 			if (outputShape.size() == 4 && outputShape[0] == 1 && outputShape[1] == 1 && outputShape[3] == 7)
@@ -93,8 +94,8 @@ namespace space
 
 				size_t max_count = outputShape[2];
 				size_t object_size = outputShape[3];
-				std::vector<ObjectDetection::Result> results;
-
+				
+				results.clear();
 				for (int i = 0; i < max_count; i++)
 				{
 					int offset = i * object_size;
@@ -115,18 +116,7 @@ namespace space
 
 					results.push_back(rt);
 				}
-
-				DrawObjectBound(debug_frame, results, labels);
-
-				std::stringstream use_time;
-				use_time << "Detection Count:" << results.size() << "  Infer Use Time:" << GetInferUseTime() << "ms";
-				cv::putText(debug_frame, use_time.str(), cv::Point(10, 25), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 0, 0), 2);
-
-				cv::imshow(debug_title.str(), debug_frame);
-				cv::waitKey(1);
 			}
-
-			return;
 		}
 		//多层输出
 		else if (shared_output_layers.size() == 2)
@@ -149,12 +139,19 @@ namespace space
 
 				//[Nx5]
 				//const float* buffer0 = (float*)shared_output_layers[0].second;
-				const float* buffer0 = requestPtr->GetBlob(shared_output_layers[0].first)->buffer().as<float*>();
+				//const float* buffer0 = requestPtr->GetBlob(shared_output_layers[0].first)->buffer().as<float*>();
+				InferenceEngine::Blob::Ptr data0;
+				request->GetBlob(shared_output_layers[0].first.c_str(), data0, 0);
+				const float* buffer0 = data0->buffer().as<float*>();
+
 				//[N]
 				//const int32_t* buffer1 = (int32_t*)shared_output_layers[1].second;
-				const int32_t* buffer1 = requestPtr->GetBlob(shared_output_layers[1].first)->buffer().as<int32_t*>();
+				//const int32_t* buffer1 = requestPtr->GetBlob(shared_output_layers[1].first)->buffer().as<int32_t*>();
+				InferenceEngine::Blob::Ptr data1;
+				request->GetBlob(shared_output_layers[1].first.c_str(), data1, 0);
+				const int32_t* buffer1 = data1->buffer().as<int32_t*>();
 
-				std::vector<ObjectDetection::Result> results;
+				results.clear();
 				for (int i = 0; i < max_count; i++)
 				{
 					Result rt;
@@ -172,19 +169,21 @@ namespace space
 
 					results.push_back(rt);
 				}
-
-				DrawObjectBound(debug_frame, results, labels);
-
-				std::stringstream use_time;
-				use_time << "Detection Count:" << results.size() << "  Infer Use Time:" << GetInferUseTime() << "ms";
-				cv::putText(debug_frame, use_time.str(), cv::Point(10, 25), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 0, 0), 2);
-
-				cv::imshow(debug_title.str(), debug_frame);
-				cv::waitKey(1);
 			}
-			return;
 		}
-		
-		return;
+
+		if (is_debug)UpdateDebugShow();
+	}
+	
+	void ObjectDetection::UpdateDebugShow()
+	{
+		DrawObjectBound(debug_frame, results, labels);
+
+		std::stringstream use_time;
+		use_time << "Detection Count:" << results.size() << "  Infer Use Time:" << GetInferUseTime() << "ms  FPS:" << GetFPS();
+		cv::putText(debug_frame, use_time.str(), cv::Point(10, 25), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 0, 0), 2);
+
+		cv::imshow(debug_title.str(), debug_frame);
+		cv::waitKey(1);
 	}
 }

@@ -11,10 +11,7 @@
 using namespace space;
 using namespace InferenceEngine;
 
-#define USE_SHARED_BLOB  true
 
-
-#if 1
 int main(int argc, char **argv)
 {
     if (SetConsoleCtrlHandler((PHANDLER_ROUTINE)space::CloseHandlerRoutine, TRUE) == FALSE)
@@ -69,8 +66,8 @@ int main(int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
+    bool reshape = true;
     bool show = args.get<bool>("show");
-    //bool async = args.get<bool>("async");
     std::map<std::string, std::string> model = ParseArgsForModel(args.get<std::string>("model"));
     std::vector<std::string> output_layer_names = SplitString(args.get<std::string>("output_layer_names"), ':');
 #pragma endregion
@@ -88,12 +85,11 @@ int main(int argc, char **argv)
     {
         InferenceEngine::Core ie;
         ObjectSegmentation detector(output_layer_names, show);
-        detector.Configuration(ie, args.get<std::string>("model"));
+        detector.Configuration(ie, args.get<std::string>("model"), reshape);
 
         inputSource.read(frame);
-#if USE_SHARED_BLOB
-        detector.ReshapeInput(frame);
-#endif
+        detector.RequestInfer(frame);
+
         std::stringstream title;
         title << "[Source] Object Segmentation [" << model["full"] << "]";
 
@@ -110,14 +106,18 @@ int main(int argc, char **argv)
             if (!IsRunning) break;
             t0 = std::chrono::high_resolution_clock::now();
 
-#if !USE_SHARED_BLOB
-            detector.RequestInfer(frame);
-#endif
-
             infer_use_time = detector.GetInferUseTime();
 
             use_time.str("");
-            use_time << "Frame/Inference Use Time:" << frame_use_time << "/" << infer_use_time << "ms";
+            use_time << "Infer/Frame Use Time:" << infer_use_time << "/" <<  frame_use_time << "ms  FPS:" << detector.GetFPS();
+            std::cout << "\33[2K\r[ INFO] " << use_time.str();
+
+            if (show)
+            {
+                //不能在源图上绘图，会影响识别
+                //cv::putText(frame, use_time.str(), cv::Point(10, 25), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 0, 0), 2);
+                cv::imshow(title.str(), frame);
+            }
 
             if (!inputSource.read(frame))
             {
@@ -126,12 +126,7 @@ int main(int argc, char **argv)
                 continue;
             }
 
-            if (show)
-            {
-                //cv::putText(frame, use_time.str(), cv::Point(10, 25), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 0, 0), 2);
-                cv::imshow(title.str(), frame);
-            }
-            std::cout << "\33[2K\r[ INFO] " << use_time.str();
+            detector.RequestInfer(frame);
 
             t1 = std::chrono::high_resolution_clock::now();
             frame_use_time = std::chrono::duration_cast<ms>(t1 - t0).count();
@@ -159,208 +154,3 @@ int main(int argc, char **argv)
     Sleep(500);
     return EXIT_SUCCESS;
 }
-#else
-
-#include "samples/common.hpp"
-#include <samples/ocv_common.hpp>
-#include <monitors\presenter.h>
-
-int main(int argc, char* argv[])
-{
-
-    try
-    {
-        Core ie;
-
-        CNNNetwork network = ie.ReadNetwork("models\\road-segmentation-adas-0001\\FP32\\road-segmentation-adas-0001.xml");
-        ICNNNetwork::InputShapes inputShapes = network.getInputShapes();
-
-        if (inputShapes.size() != 1)
-            throw std::runtime_error("Demo supports topologies only with 1 input");
-
-        const std::string& inName = inputShapes.begin()->first;
-        SizeVector& inSizeVector = inputShapes.begin()->second;
-        if (inSizeVector.size() != 4 || inSizeVector[1] != 3)
-            throw std::runtime_error("3-channel 4-dimensional model's input is expected");
-
-        inSizeVector[0] = 1;  // set batch size to 1
-        network.reshape(inputShapes);
-
-        InputInfo& inputInfo = *network.getInputsInfo().begin()->second;
-        inputInfo.getPreProcess().setResizeAlgorithm(ResizeAlgorithm::RESIZE_BILINEAR);
-        inputInfo.setLayout(Layout::NHWC);
-        inputInfo.setPrecision(Precision::U8);
-
-        const OutputsDataMap& outputsDataMap = network.getOutputsInfo();
-        if (outputsDataMap.size() != 1) 
-            throw std::runtime_error("Demo supports topologies only with 1 output");
-
-        const std::string& outName = outputsDataMap.begin()->first;
-        Data& data = *outputsDataMap.begin()->second;
-
-        // 如果模型执行Arg Max，则其输出类型可以为I32，但是对于返回每个类的热图的模型，输出通常为FP32。
-        // 重置精度以避免使用开关后处理处理不同类型
-        data.setPrecision(Precision::FP32);
-        const SizeVector& outSizeVector = data.getTensorDesc().getDims();
-        int outChannels, outHeight, outWidth;
-        switch (outSizeVector.size()) {
-        case 3:
-            outChannels = 0;
-            outHeight = outSizeVector[1];
-            outWidth = outSizeVector[2];
-            break;
-        case 4:
-            outChannels = outSizeVector[1];
-            outHeight = outSizeVector[2];
-            outWidth = outSizeVector[3];
-            break;
-        default:
-            throw std::runtime_error("Unexpected output blob shape. Only 4D and 3D output blobs are"
-                "supported.");
-        }
-
-        ExecutableNetwork executableNetwork = ie.LoadNetwork(network, "CPU");
-        InferRequest inferRequest = executableNetwork.CreateInferRequest();
-
-        InputSource cap;
-        cap.open("video:video/video_03.mp4");
-        
-
-        float blending = 0.3f;
-        constexpr char WIN_NAME[] = "segmentation";
-
-        bool show = true;
-        if (show) 
-        {
-            cv::namedWindow(WIN_NAME);
-            int initValue = static_cast<int>(blending * 100);
-            cv::createTrackbar("blending", WIN_NAME, &initValue, 100,
-                [](int position, void* blendingPtr) {*static_cast<float*>(blendingPtr) = position * 0.01f; },
-                &blending);
-        }
-
-        cv::Mat inImg, resImg, maskImg(outHeight, outWidth, CV_8UC3);
-        std::vector<cv::Vec3b> colors(arraySize(CITYSCAPES_COLORS));
-        for (std::size_t i = 0; i < colors.size(); ++i)
-            colors[i] = { CITYSCAPES_COLORS[i].blue(), CITYSCAPES_COLORS[i].green(), CITYSCAPES_COLORS[i].red() };
-
-        std::mt19937 rng;
-        std::uniform_int_distribution<int> distr(0, 255);
-
-        int FLAGS_delay = 1;
-        int delay = FLAGS_delay;
-
-        cv::Size graphSize{ static_cast<int>(cap.get(cv::CAP_PROP_FRAME_WIDTH) / 4), 60 };
-        Presenter presenter("", 10, graphSize);
-
-        std::chrono::steady_clock::duration latencySum{ 0 };
-        unsigned latencySamplesNum = 0;
-        std::ostringstream latencyStream;
-
-        std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
-        while (cap.read(inImg) && delay >= 0) 
-        {
-            if (CV_8UC3 != inImg.type())
-                throw std::runtime_error("BGR (or RGB) image expected to come from input");
-
-            inferRequest.SetBlob(inName, wrapMat2Blob(inImg));
-            inferRequest.Infer();
-
-            const float* const predictions = inferRequest.GetBlob(outName)->cbuffer().as<float*>();
-            for (int rowId = 0; rowId < outHeight; ++rowId)
-            {
-                for (int colId = 0; colId < outWidth; ++colId) 
-                {
-                    std::size_t classId = 0;
-                    if (outChannels == 0) 
-                    {  
-                        // assume the output is already ArgMax'ed
-                        classId = static_cast<std::size_t>(predictions[rowId * outWidth + colId]);
-                    }
-                    else 
-                    {
-                        float maxProb = -1.0f;
-                        for (int chId = 0; chId < outChannels; ++chId) 
-                        {
-                            float prob = predictions[chId * outHeight * outWidth + rowId * outWidth + colId];
-                            if (prob > maxProb) {
-                                classId = chId;
-                                maxProb = prob;
-                            }
-                        }
-                    }
-                    while (classId >= colors.size())
-                    {
-                        cv::Vec3b color(distr(rng), distr(rng), distr(rng));
-                        colors.push_back(color);
-                    }
-                    maskImg.at<cv::Vec3b>(rowId, colId) = colors[classId];
-                }
-            }
-            cv::resize(maskImg, resImg, inImg.size());
-            //resImg = inImg * blending + resImg * (1 - blending);
-            //presenter.drawGraphs(resImg);
-            imshow("BG", resImg);
-
-            latencySum += std::chrono::steady_clock::now() - t0;
-            ++latencySamplesNum;
-            latencyStream.str("");
-            latencyStream << std::fixed << std::setprecision(1)
-                << (std::chrono::duration_cast<ms>(latencySum) / latencySamplesNum).count() << " ms";
-
-            constexpr int FONT_FACE = cv::FONT_HERSHEY_SIMPLEX;
-            constexpr double FONT_SCALE = 2;
-            constexpr int THICKNESS = 2;
-            int baseLine;
-
-            cv::getTextSize(latencyStream.str(), FONT_FACE, FONT_SCALE, THICKNESS, &baseLine);
-            cv::putText(resImg, latencyStream.str(), cv::Size{ 0, resImg.rows - baseLine }, FONT_FACE, FONT_SCALE,
-                cv::Scalar{ 255, 0, 0 }, THICKNESS);
-
-            if (show) {
-                cv::imshow(WIN_NAME, resImg);
-                int key = cv::waitKey(delay);
-                switch (key) {
-                case 'q':
-                case 'Q':
-                case 27: // Esc
-                    delay = -1;
-                    break;
-                case 'p':
-                case 'P':
-                case 32: // Space
-                    delay = !delay * (FLAGS_delay + !FLAGS_delay);
-                    break;
-                default:
-                    presenter.handleKey(key);
-                }
-            }
-            t0 = std::chrono::steady_clock::now();
-        }
-        std::cout << "Mean pipeline latency: " << latencyStream.str() << '\n';
-        std::cout << presenter.reportMeans() << '\n';
-    }
-    catch (const std::exception& error) {
-        std::cout << error.what() << std::endl;
-        return 1;
-    }
-    catch (...) {
-        std::cout << "Unknown/internal exception happened." << std::endl;
-        return 1;
-    }
-
-    std::cout << "Execution successful" << std::endl;
-    return 0;
-}
-#endif
-
-// 运行程序: Ctrl + F5 或调试 >“开始执行(不调试)”菜单
-// 调试程序: F5 或调试 >“开始调试”菜单
-
-// 入门使用技巧: 
-//   1. 使用解决方案资源管理器窗口添加/管理文件
-//   2. 使用团队资源管理器窗口连接到源代码管理
-//   3. 使用输出窗口查看生成输出和其他消息
-//   4. 使用错误列表窗口查看错误
-//   5. 转到“项目”>“添加新项”以创建新的代码文件，或转到“项目”>“添加现有项”以将现有代码文件添加到项目
-//   6. 将来，若要再次打开此项目，请转到“文件”>“打开”>“项目”并选择 .sln 文件

@@ -36,7 +36,13 @@
     <ClInclude Include="output_source.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="open_model_inference.hpp">
+    <ClInclude Include="Timer.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="open_model_infer.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="open_model_multi_infer.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
@@ -50,7 +56,10 @@
     <ClCompile Include="input_source.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="open_model_inference.cpp">
+    <ClCompile Include="open_model_infer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="open_model_multi_infer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
