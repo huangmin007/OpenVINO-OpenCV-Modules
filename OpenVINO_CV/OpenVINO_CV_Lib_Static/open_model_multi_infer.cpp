@@ -42,48 +42,66 @@ namespace space
 
 		LOG("INFO") << "\t读取 IR 文件: " << model_path << " [" << device << "]" << std::endl;
 		cnnNetwork = ie.ReadNetwork(model_path);
-		cnnNetwork.setBatchSize(1);
+		cnnNetwork.setBatchSize(is_reshape ? 1 : 4);
 
 		//配置网络输入/输出
 		ConfigNetworkIO();
 
+		std::map<std::string, std::string> config = { };
+		bool isPossibleDynBatch = device.find("CPU") != std::string::npos || device.find("GPU") != std::string::npos;
+		if (isPossibleDynBatch)
+		{
+			config[InferenceEngine::PluginConfigParams::KEY_CPU_THREADS_NUM] = "8";
+			config[InferenceEngine::PluginConfigParams::KEY_DYN_BATCH_LIMIT] = "-1";
+
+			std::cout << "Batch Size:" << cnnNetwork.getBatchSize() << std::endl;
+			if(cnnNetwork.getBatchSize() > 1)
+				config[InferenceEngine::PluginConfigParams::KEY_DYN_BATCH_ENABLED] = InferenceEngine::PluginConfigParams::YES;
+		}
+
 		LOG("INFO") << "正在创建可执行网络 ... " << std::endl;
-		execNetwork = ie.LoadNetwork(cnnNetwork, device);
+		execNetwork = ie.LoadNetwork(cnnNetwork, device);//, config);
 		LOG("INFO") << "正在创建推断请求对象 ... " << std::endl;
 		for (int i = 0; i < request_count; i++)
 			requestPtrs.push_back(execNetwork.CreateInferRequestPtr());
 
-		//创建输出共享
-		CreateOutputShared();
-
-		typedef InferenceEngine::IInferRequest::CompletionCallback	TCompletionCallback;
-		typedef std::function<void(InferenceEngine::InferRequest, InferenceEngine::StatusCode)>		FCompletionCallback;
 		for (static uint8_t i = 0; i < requestPtrs.size(); i++)
 		{
 			requestPtrs[i]->SetCompletionCallback<FCompletionCallback>((FCompletionCallback)
 				[&](InferenceEngine::IInferRequest::Ptr request, InferenceEngine::StatusCode code)
 				{
-					//{
-						//std::unique_lock<std::shared_mutex> lock(_fps_mutex);
+					{
+						std::lock_guard<std::shared_mutex> lock(_fps_mutex);
 						fps_count++;
-					//}
-
+					}
+#if _DEBUG
+					InferenceEngine::Blob::Ptr data;
+					request->GetBlob(outputsInfo.begin()->first.c_str(), data, 0);
+					std::cout << "Result::" << (void*)(data->buffer().as<float*>()) << std::endl;
+#endif
 					ParsingOutputData(request, code);
 
-					if (this->is_reshape)
-						request->StartAsync(0);
+					if (!this->is_reshape)
+					{
+						InferenceEngine::Blob::Ptr inputBlob;
+						request->GetBlob(inputsInfo.begin()->first.c_str(), inputBlob, 0);
+						MatU8ToBlob<uint8_t>(frame_ptr, inputBlob);
+					}
+
+					request->StartAsync(0);
 				});
 		}
 
 		timer.start(1000, [&]
 			{
-				//std::unique_lock<std::shared_mutex> lock(_fps_mutex);
+				std::lock_guard<std::shared_mutex> lock(_fps_mutex);
 				fps = fps_count;
 				fps_count = 0;
 			});
 
+		//创建输出共享
+		CreateMemoryShared();
 		is_configuration = true;
-
 	}
 
 	void OpenModelMultiInferBase::ConfigNetworkIO()
@@ -178,7 +196,7 @@ namespace space
 		debug_title << "[" << cnnNetwork.getName() << "] Output Size:" << outputsInfo.size() << "  Name:[" << shared_layers_info.begin()->first << "]  Shape:" << shape.str() << std::endl;
 	}
 
-	void OpenModelMultiInferBase::CreateOutputShared()
+	void OpenModelMultiInferBase::CreateMemoryShared()
 	{
 		LOG("INFO") << "正在创建/映射共享内存块 ... " << std::endl;
 		for (const auto& shared : shared_layers_info)
@@ -194,8 +212,7 @@ namespace space
 				//重新设置指定输出层 Blob, 将指定输出层数据指向为共享指针，实现该层数据共享
 				try
 				{
-					//input->buffer().as<InferenceEngine::PrecisionTrait<InferenceEngine::Precision::U8>::value_type*>();
-					//MemoryOutputMapping({ shared.first , pBuffer });
+					//MemorySharedBlob({ shared.first , pBuffer });
 				}
 				catch (const std::exception& ex)
 				{
@@ -217,23 +234,24 @@ namespace space
 		if (frame.empty() || frame.type() != CV_8UC3)
 			throw std::logic_error("输入图像帧不能为空帧对象，CV_8UC3 类型 ... ");
 
-		frame_ptr = frame;		
-		static bool is_config_reshape = false;
+		frame_ptr = frame;
+		InferenceEngine::StatusCode code;
+		InferenceEngine::InferRequest::Ptr requestPtr;
 
-		if (is_reshape && !is_config_reshape)
+		//查找没有启动的推断对象
+		for (auto& request : requestPtrs)
 		{
-			is_config_reshape = true;
-
-			if (requestPtrs.size() > 1)
+			code = request->Wait(InferenceEngine::IInferRequest::WaitMode::STATUS_ONLY);
+			if (code == InferenceEngine::StatusCode::INFER_NOT_STARTED)
 			{
-				for (int i = 0; i < requestPtrs.size(); i++)
-				{
-					cv::Mat _frame;
-					frame.copyTo(_frame);
-					frames.push_back(_frame);
-				}
+				requestPtr = request;
+				break;
 			}
+		}
+		if (requestPtr == nullptr) return;
 
+		if (is_reshape)
+		{
 			size_t width = frame.cols;
 			size_t height = frame.rows;
 			size_t channels = frame.channels();
@@ -244,59 +262,18 @@ namespace space
 			bool is_dense = strideW == channels && strideH == channels * width;
 			if (!is_dense) throw std::logic_error("输入的图像帧不支持转换 ... ");
 
-			//全部指向同一个指针？？
+			//重新设置输入层 Blob，将输入图像内存数据指针共享给输入层，做实时或异步推断
+			//输入为图像原始尺寸，其实是会存在问题的，如果源图尺寸很大，那处理时间会更长
 			InferenceEngine::TensorDesc inputTensorDesc = inputsInfo.begin()->second->getTensorDesc();
 			InferenceEngine::TensorDesc tDesc(inputTensorDesc.getPrecision(), { 1, channels, height, width }, inputTensorDesc.getLayout());
-			
-			for (int i = 0; i < requestPtrs.size(); i++)
-			{
-				if(requestPtrs.size() > 1)
-					requestPtrs[i]->SetBlob(inputsInfo.begin()->first, InferenceEngine::make_shared_blob<uint8_t>(tDesc, frames[i].data));
-				else
-					requestPtrs[i]->SetBlob(inputsInfo.begin()->first, InferenceEngine::make_shared_blob<uint8_t>(tDesc, frame.data));
-			}
-		}
-
-		InferenceEngine::StatusCode code;
-		if (is_reshape)
-		{
-			if (requestPtrs.size() > 1)
-			{
-				frame.copyTo(frames[findex]);
-				findex = findex + 1 >= frames.size() ? 0 : findex + 1;
-			}
-
-			for (auto &request : requestPtrs)
-			{
-				code = request->Wait(InferenceEngine::IInferRequest::WaitMode::STATUS_ONLY);
-				if (code == InferenceEngine::StatusCode::INFER_NOT_STARTED)
-				{
-					request->StartAsync();
-					break;
-				}
-			}
-
-			return;
+			requestPtr->SetBlob(inputsInfo.begin()->first, InferenceEngine::make_shared_blob<uint8_t>(tDesc, frame.data));
 		}
 		else
 		{
-			int index = -1;
-			InferenceEngine::InferRequest::Ptr requestPtr;
-			for (auto &request:requestPtrs)
-			{
-				code = request->Wait(InferenceEngine::IInferRequest::WaitMode::STATUS_ONLY);
-				if (code == InferenceEngine::StatusCode::INFER_NOT_STARTED || code == InferenceEngine::StatusCode::OK)
-				{
-					InferenceEngine::Blob::Ptr inputBlob = requestPtr->GetBlob(inputsInfo.begin()->first);
-					MatU8ToBlob<uint8_t>(frame, inputBlob);
-
-					//开始异步推断
-					request->StartAsync();
-					//request->Wait(InferenceEngine::IInferRequest::WaitMode::STATUS_ONLY);
-					break;
-				}
-			}
+			InferenceEngine::Blob::Ptr inputBlob = requestPtr->GetBlob(inputsInfo.begin()->first);
+			MatU8ToBlob<uint8_t>(frame, inputBlob);
 		}
 
+		requestPtr->StartAsync();
 	}
 }

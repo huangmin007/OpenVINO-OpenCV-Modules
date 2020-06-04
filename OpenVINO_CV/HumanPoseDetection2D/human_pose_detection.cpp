@@ -25,9 +25,11 @@ namespace space
         std::vector<std::vector<Peak> >& peaksFromHeatMap;
     };
 
-    
-    HumanPoseDetection::HumanPoseDetection(const std::vector<std::string>& output_layers_name, bool is_debug)
-        :OpenModelMultiInferBase(output_layers_name, is_debug)
+#if USE_MULTI_INFER
+    HumanPoseDetection::HumanPoseDetection(const std::vector<std::string>& output_layers_name, bool is_debug):OpenModelMultiInferBase(output_layers_name, is_debug)
+#else
+    HumanPoseDetection::HumanPoseDetection(const std::vector<std::string>& output_layers_name, bool is_debug) : OpenModelInferBase(output_layers_name, is_debug)
+#endif
     {
     };
     HumanPoseDetection::~HumanPoseDetection()
@@ -161,6 +163,10 @@ namespace space
         const float* heatMapsData = heatMapsBlob->buffer().as<float*>();
         const float* pafsData = pafsBlob->buffer().as<float*>();
 
+#if _DEBUG
+        std::cout << "Address:" << (void*)heatMapsData << std::endl;
+#endif
+
         int offset = heatMapDims[2] * heatMapDims[3];
         int nPafs = pafsBlob->getTensorDesc().getDims()[1];
 
@@ -185,7 +191,8 @@ namespace space
         correctCoordinates(poses, heatMaps[0].size(), frame_ptr.size());
         
         ConvertToSharedXML(poses, "pose2d_output.bin");
-        OpenModelMultiInferBase::ParsingOutputData(request, code);
+
+        if (is_debug)UpdateDebugShow();
     }
     
     void HumanPoseDetection::ConvertToSharedXML(const std::vector<HumanPose>& poses, const std::string shared_name)

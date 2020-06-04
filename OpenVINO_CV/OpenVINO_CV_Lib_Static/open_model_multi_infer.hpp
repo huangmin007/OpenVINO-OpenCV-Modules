@@ -11,6 +11,9 @@
 
 namespace space
 {
+	typedef InferenceEngine::IInferRequest::CompletionCallback	TCompletionCallback;
+	typedef std::function<void(InferenceEngine::InferRequest, InferenceEngine::StatusCode)>	FCompletionCallback;
+
 	/// <summary>
 	/// 开放模型推断基类，基于图像为输入源，异步推断，输出层内存映射共享
 	/// <para>自定义 InferRequest 数量对象，跟据其硬件性能</para>
@@ -73,6 +76,13 @@ namespace space
 		/// 配置网络输入/输出，是用于子类做其它配置的
 		/// </summary>
 		virtual void ConfigNetworkIO();
+
+		/// <summary>
+		/// 创建输出内存共享，并映射到指定的网络输出层
+		/// <para>是否映射到网络输出层，由子类决定</para>
+		/// </summary>
+		virtual void CreateMemoryShared();
+
 		/// <summary>
 		/// 解析输出层数据，可能是二次输出，或是调试显示输出
 		/// </summary>
@@ -100,8 +110,8 @@ namespace space
 		//推断请求对象
 		std::vector<InferenceEngine::InferRequest::Ptr> requestPtrs;
 		
-		int findex = 0;
-		std::vector<cv::Mat> frames;
+		//int findex = 0;
+		//std::vector<cv::Mat> frames;
 
 
 		//引用输入的帧对象，主要是需要帧的宽，高，通道，类型、数据指针信息
@@ -112,16 +122,7 @@ namespace space
 		std::vector<std::pair<std::string, LPVOID>> shared_output_layers;
 
 	private:
-		/// <summary>
-		/// 创建输出内存共享，并映射到指定的网络输出层
-		/// <para>是否映射到网络输出层，由子类决定</para>
-		/// </summary>
-		void CreateOutputShared();
-		/// <summary>
-		/// 内存输出映射
-		/// </summary>
-		/// <param name="shared"></param>
-		void MemoryOutputMapping(const std::pair<std::string, LPVOID>& shared);
+		
 
 		//需要指定的输出层名称，该参数用于有多层输出的网络
 		std::vector<std::string> output_layers;

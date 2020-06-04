@@ -79,6 +79,7 @@ namespace space
 		//单层输出
 		if (shared_output_layers.size() == 1)
 		{
+			// 三种方式都可获取到数据
 			//const float* buffer = (float*)shared_output_layers.begin()->second;
 			//const float* buffer = requestPtr->GetBlob(shared_output_layers.begin()->first)->buffer().as<float*>();
 			
@@ -137,15 +138,15 @@ namespace space
 				size_t input_height = inputShape[2];
 				size_t input_width = inputShape[3];
 
-				//[Nx5]
-				//const float* buffer0 = (float*)shared_output_layers[0].second;
-				//const float* buffer0 = requestPtr->GetBlob(shared_output_layers[0].first)->buffer().as<float*>();
-				InferenceEngine::Blob::Ptr data0;
+				//[Nx5]  三种方式都可获取到数据
+				//const float* buffer0 = (float*)shared_output_layers[0].second;		//第一种
+				//const float* buffer0 = requestPtr->GetBlob(shared_output_layers[0].first)->buffer().as<float*>();	//第二种
+				InferenceEngine::Blob::Ptr data0;										//第三种
 				request->GetBlob(shared_output_layers[0].first.c_str(), data0, 0);
 				const float* buffer0 = data0->buffer().as<float*>();
 
 				//[N]
-				//const int32_t* buffer1 = (int32_t*)shared_output_layers[1].second;
+				//const int32_t* buffer1 = (int32_t*)shared_output_layers[1].second;		
 				//const int32_t* buffer1 = requestPtr->GetBlob(shared_output_layers[1].first)->buffer().as<int32_t*>();
 				InferenceEngine::Blob::Ptr data1;
 				request->GetBlob(shared_output_layers[1].first.c_str(), data1, 0);

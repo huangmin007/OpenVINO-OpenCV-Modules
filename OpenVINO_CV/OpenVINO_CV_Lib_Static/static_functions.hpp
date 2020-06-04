@@ -49,6 +49,16 @@ namespace space
 	template <typename T>
 	void MatU8ToBlob(const cv::Mat& orig_image, InferenceEngine::Blob::Ptr& blob, int batchIndex = 0);
 
+   
+    template <typename T>
+    std::ostream& operator << (std::ostream& stream, const std::vector<T>& v)
+    {
+        stream << "[";
+        for (int i = 0; i < v.size(); i++)
+            stream << v[i] << (i != v.size() - 1 ? "," : "]");
+
+        return stream;
+    }
 
     /// <summary>
     /// 输出 InferenceEngine 引擎版本，及可计算设备列表
@@ -81,12 +91,7 @@ namespace space
             for (const auto& input : inputsInfo)
             {
                 InferenceEngine::SizeVector inputDims = input.second->getTensorDesc().getDims();
-
-                std::stringstream shape; shape << "[";
-                for (int i = 0; i < inputDims.size(); i++)
-                    shape << inputDims[i] << (i != inputDims.size() - 1 ? "x" : "]");
-
-                LOG("INFO") << "\tOutput Name:[" << input.first << "]  Shape:" << shape.str() << "  Precision:[" << input.second->getPrecision() << "]" << std::endl;
+                LOG("INFO") << "\tOutput Name:[" << input.first << "]  Shape:" << inputDims << "  Precision:[" << input.second->getPrecision() << "]" << std::endl;
             }
 
             //------------Output-----------
@@ -95,11 +100,7 @@ namespace space
             for (const auto& output : outputsInfo)
             {
                 InferenceEngine::SizeVector outputDims = output.second->getTensorDesc().getDims();
-                std::stringstream shape; shape << "[";
-                for (int i = 0; i < outputDims.size(); i++)
-                    shape << outputDims[i] << (i != outputDims.size() - 1 ? "x" : "]");
-
-                LOG("INFO") << "\tOutput Name:[" << output.first << "]  Shape:" << shape.str() << "  Precision:[" << output.second->getPrecision() << "]" << std::endl;
+                LOG("INFO") << "\tOutput Name:[" << output.first << "]  Shape:" << outputDims << "  Precision:[" << output.second->getPrecision() << "]" << std::endl;
             }
 
             std::cout << std::endl;
@@ -476,112 +477,6 @@ namespace space
         return dist;
     }
 
-
-    inline std::size_t getTensorWidth(const InferenceEngine::TensorDesc& desc)
-    {
-        const auto& layout = desc.getLayout();
-        const auto& dims = desc.getDims();
-        const auto& size = dims.size();
-        if ((size >= 2) &&
-            (layout == InferenceEngine::Layout::NCHW ||
-                layout == InferenceEngine::Layout::NHWC ||
-                layout == InferenceEngine::Layout::NCDHW ||
-                layout == InferenceEngine::Layout::NDHWC ||
-                layout == InferenceEngine::Layout::OIHW ||
-                layout == InferenceEngine::Layout::CHW ||
-                layout == InferenceEngine::Layout::HW))
-        {
-            // 无论布局如何，尺寸均以固定顺序存储
-            return dims.back();
-        }
-        else {
-            THROW_IE_EXCEPTION << "张量没有宽度尺寸";
-        }
-        return 0;
-    }
-
-    inline std::size_t getTensorHeight(const InferenceEngine::TensorDesc& desc) 
-    {
-        const auto& layout = desc.getLayout();
-        const auto& dims = desc.getDims();
-        const auto& size = dims.size();
-        if ((size >= 2) &&
-            (layout == InferenceEngine::Layout::NCHW ||
-                layout == InferenceEngine::Layout::NHWC ||
-                layout == InferenceEngine::Layout::NCDHW ||
-                layout == InferenceEngine::Layout::NDHWC ||
-                layout == InferenceEngine::Layout::OIHW ||
-                layout == InferenceEngine::Layout::CHW ||
-                layout == InferenceEngine::Layout::HW)) {
-            // Regardless of layout, dimensions are stored in fixed order
-            return dims.at(size - 2);
-        }
-        else {
-            THROW_IE_EXCEPTION << "张量没有高度尺寸";
-        }
-        return 0;
-    }
-
-    inline std::size_t getTensorChannels(const InferenceEngine::TensorDesc& desc) 
-    {
-        const auto& layout = desc.getLayout();
-        if (layout == InferenceEngine::Layout::NCHW ||
-            layout == InferenceEngine::Layout::NHWC ||
-            layout == InferenceEngine::Layout::NCDHW ||
-            layout == InferenceEngine::Layout::NDHWC ||
-            layout == InferenceEngine::Layout::C ||
-            layout == InferenceEngine::Layout::CHW ||
-            layout == InferenceEngine::Layout::NC ||
-            layout == InferenceEngine::Layout::CN) {
-            // Regardless of layout, dimensions are stored in fixed order
-            const auto& dims = desc.getDims();
-            switch (desc.getLayoutByDims(dims)) {
-            case InferenceEngine::Layout::C:     return dims.at(0);
-            case InferenceEngine::Layout::NC:    return dims.at(1);
-            case InferenceEngine::Layout::CHW:   return dims.at(0);
-            case InferenceEngine::Layout::NCHW:  return dims.at(1);
-            case InferenceEngine::Layout::NCDHW: return dims.at(1);
-            case InferenceEngine::Layout::SCALAR:   // [[fallthrough]]
-            case InferenceEngine::Layout::BLOCKED:  // [[fallthrough]]
-            default:
-                THROW_IE_EXCEPTION << "张量没有通道尺寸";
-            }
-        }
-        else {
-            THROW_IE_EXCEPTION << "张量没有通道尺寸";
-        }
-        return 0;
-    }
-
-    inline std::size_t getTensorBatch(const InferenceEngine::TensorDesc& desc)
-    {
-        const auto& layout = desc.getLayout();
-        if (layout == InferenceEngine::Layout::NCHW ||
-            layout == InferenceEngine::Layout::NHWC ||
-            layout == InferenceEngine::Layout::NCDHW ||
-            layout == InferenceEngine::Layout::NDHWC ||
-            layout == InferenceEngine::Layout::NC ||
-            layout == InferenceEngine::Layout::CN) {
-            // Regardless of layout, dimensions are stored in fixed order
-            const auto& dims = desc.getDims();
-            switch (desc.getLayoutByDims(dims)) {
-            case InferenceEngine::Layout::NC:    return dims.at(0);
-            case InferenceEngine::Layout::NCHW:  return dims.at(0);
-            case InferenceEngine::Layout::NCDHW: return dims.at(0);
-            case InferenceEngine::Layout::CHW:      // [[fallthrough]]
-            case InferenceEngine::Layout::C:        // [[fallthrough]]
-            case InferenceEngine::Layout::SCALAR:   // [[fallthrough]]
-            case InferenceEngine::Layout::BLOCKED:  // [[fallthrough]]
-            default:
-                THROW_IE_EXCEPTION << "张量没有批次尺寸";
-            }
-        }
-        else {
-            THROW_IE_EXCEPTION << "张量没有批次尺寸";
-        }
-        return 0;
-    }
-
     /// <summary>
     /// 缩放 cv::Rect 对象
     /// </summary>
@@ -647,4 +542,121 @@ namespace space
 
         return sizeof(uint8_t);
     }
+
+    /// <summary>
+    /// 内存共享 Blob (网络层)
+    /// </summary>
+    /// <param name="requestPtr"></param>
+    /// <param name="shared">{name, void*}</param>
+    inline void MemorySharedBlob(InferenceEngine::InferRequest::Ptr& requestPtr, const std::pair<std::string, LPVOID>& shared)
+    {
+        InferenceEngine::TensorDesc tensor = requestPtr->GetBlob(shared.first)->getTensorDesc();
+        const InferenceEngine::Precision precision  = tensor.getPrecision();
+
+        switch (precision)
+        {
+        case InferenceEngine::Precision::U64:	//uint64_t
+            requestPtr->SetBlob(shared.first, InferenceEngine::make_shared_blob<uint64_t>(tensor, (uint64_t*)shared.second));
+            break;
+        case InferenceEngine::Precision::I64:	//int64_t
+            requestPtr->SetBlob(shared.first, InferenceEngine::make_shared_blob<int64_t>(tensor, (int64_t*)shared.second));
+            break;
+        case InferenceEngine::Precision::FP32:	//float
+            requestPtr->SetBlob(shared.first, InferenceEngine::make_shared_blob<float>(tensor, (float*)shared.second));
+            break;
+        case InferenceEngine::Precision::I32:	//int32_t
+            requestPtr->SetBlob(shared.first, InferenceEngine::make_shared_blob<int32_t>(tensor, (int32_t*)shared.second));
+            break;
+        case InferenceEngine::Precision::U16:	//uint16_t
+            requestPtr->SetBlob(shared.first, InferenceEngine::make_shared_blob<uint16_t>(tensor, (uint16_t*)shared.second));
+            break;
+        case InferenceEngine::Precision::I16:	//int16_t
+        case InferenceEngine::Precision::Q78:	//int16_t, uint16_t
+        case InferenceEngine::Precision::FP16:	//int16_t, uint16_t	
+            requestPtr->SetBlob(shared.first, InferenceEngine::make_shared_blob<int16_t>(tensor, (int16_t*)shared.second));
+            break;
+        case InferenceEngine::Precision::U8:	//uint8_t
+        case InferenceEngine::Precision::BOOL:	//uint8_t
+            requestPtr->SetBlob(shared.first, InferenceEngine::make_shared_blob<uint8_t>(tensor, (uint8_t*)shared.second));
+            break;
+        case InferenceEngine::Precision::I8:	//int8_t
+        case InferenceEngine::Precision::BIN:	//int8_t, uint8_t
+            requestPtr->SetBlob(shared.first, InferenceEngine::make_shared_blob<int8_t>(tensor, (int8_t*)shared.second));
+            break;
+        default:
+            LOG("WARN") << "共享映射数据，未处理的输出精度：" << precision << std::endl;
+            throw std::invalid_argument("共享映射数据，未处理的输出精度：" + precision);
+        }
+    }
+
+
+    /// <summary>
+    /// 输出参数信息
+    /// </summary>
+    /// <param name="value"></param>
+    static void PrintParameterValue(const InferenceEngine::Parameter& value)
+    {
+        if (value.is<bool>())
+        {
+            std::cout << std::boolalpha << value.as<bool>() << std::noboolalpha << std::endl;
+        }
+        else if (value.is<int>())
+        {
+            std::cout << value.as<int>() << std::endl;
+        }
+        else if (value.is<unsigned int>())
+        {
+            std::cout << value.as<unsigned int>() << std::endl;
+        }
+        else if (value.is<float>())
+        {
+            std::cout << value.as<float>() << std::endl;
+        }
+        else if (value.is<std::string>())
+        {
+            std::string stringValue = value.as<std::string>();
+            std::cout << (stringValue.empty() ? "\"\"" : stringValue) << std::endl;
+        }
+        else if (value.is<std::vector<std::string> >())
+        {
+            std::cout << value.as<std::vector<std::string> >() << std::endl;
+        }
+        else if (value.is<std::vector<int> >())
+        {
+            std::cout << value.as<std::vector<int> >() << std::endl;
+        }
+        else if (value.is<std::vector<float> >())
+        {
+            std::cout << value.as<std::vector<float> >() << std::endl;
+        }
+        else if (value.is<std::vector<unsigned int> >())
+        {
+            std::cout << value.as<std::vector<unsigned int> >() << std::endl;
+        }
+        else if (value.is<std::tuple<unsigned int, unsigned int, unsigned int> >())
+        {
+            auto values = value.as<std::tuple<unsigned int, unsigned int, unsigned int> >();
+            std::cout << "{ ";
+            std::cout << std::get<0>(values) << ", ";
+            std::cout << std::get<1>(values) << ", ";
+            std::cout << std::get<2>(values);
+            std::cout << " }";
+            std::cout << std::endl;
+        }
+        else if (value.is<std::tuple<unsigned int, unsigned int> >())
+        {
+            auto values = value.as<std::tuple<unsigned int, unsigned int> >();
+            std::cout << "{ ";
+            std::cout << std::get<0>(values) << ", ";
+            std::cout << std::get<1>(values);
+            std::cout << " }";
+            std::cout << std::endl;
+        }
+        else
+        {
+            std::cout << "UNSUPPORTED TYPE" << std::endl;
+        }
+    }
+
+    
 }

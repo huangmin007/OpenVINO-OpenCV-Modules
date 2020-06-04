@@ -11,8 +11,6 @@
 
 #include "cmdline.h"
 
-#define USE_SHARED_BLOB false
-
 using namespace space;
 
 int main(int argc, char **argv)
@@ -81,9 +79,12 @@ int main(int argc, char **argv)
     try
     {
         InferenceEngine::Core ie;
-        HumanPoseDetection detector(output_layer_names, show);
+        HumanPoseDetection detector(output_layer_names, !show);
+#if USE_MULTI_INFER
         detector.Configuration(ie, args.get<std::string>("model"), true, 1);
-
+#else
+        detector.Configuration(ie, args.get<std::string>("model"), false);
+#endif
         std::map<std::string, std::string> model = ParseArgsForModel(args.get<std::string>("model"));
 
         inputSource.read(frame);
@@ -107,8 +108,8 @@ int main(int argc, char **argv)
             t0 = std::chrono::high_resolution_clock::now();
 
             use_time.str("");
-            use_time << "Frame Use Time:" << frame_use_time << "ms  FPS:" << detector.GetFPS();
-            //std::cout << "\33[2K\r[ INFO] " << use_time.str();
+            use_time << "Infer/Frame Use Time:" << detector.GetInferUseTime() << "/" << frame_use_time << "ms  FPS:" << detector.GetFPS();
+            std::cout << "\33[2K\r[ INFO] " << use_time.str();
 
             if (show)
             {
@@ -151,14 +152,3 @@ int main(int argc, char **argv)
 
     return EXIT_SUCCESS;
 }
-
-// 运行程序: Ctrl + F5 或调试 >“开始执行(不调试)”菜单
-// 调试程序: F5 或调试 >“开始调试”菜单
-
-// 入门使用技巧: 
-//   1. 使用解决方案资源管理器窗口添加/管理文件
-//   2. 使用团队资源管理器窗口连接到源代码管理
-//   3. 使用输出窗口查看生成输出和其他消息
-//   4. 使用错误列表窗口查看错误
-//   5. 转到“项目”>“添加新项”以创建新的代码文件，或转到“项目”>“添加现有项”以将现有代码文件添加到项目
-//   6. 将来，若要再次打开此项目，请转到“文件”>“打开”>“项目”并选择 .sln 文件

@@ -54,7 +54,7 @@ int main(int argc, char** argv)
     args.add("help", 'h', "参数说明");
     args.add("info", 0, "Inference Engine Infomation");
 
-    args.add<std::string>("input", 'i', "输入源参数，格式：(video|camera|shared)[:value[:value[:...]]]", false, "cam:0");
+    args.add<std::string>("input", 'i', "输入源参数，格式：(video|camera|shared)[:value[:value[:...]]]", false, "cam:0:1920x1080");
     args.add<std::string>("output", 'o', "输出源参数，格式：(shared|console|video)[:value[:value[:...]]]", false, "shared:pose2d_output.bin");
     args.add<std::string>("model", 'm', "用于 AI识别检测 的 网络模型名称/文件(.xml)和目标设备，格式：(AI模型名称)[:精度[:硬件]]，"
         "示例：human-pose-estimation-0001:FP32:CPU 或 human-pose-estimation-0001:FP16:GPU", false, "human-pose-estimation-0001:FP32:CPU");

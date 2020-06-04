@@ -9,6 +9,10 @@
 #include "cmdline.h"
 #include "static_functions.hpp"
 
+using namespace space;
+using namespace InferenceEngine;
+
+
 
 int main(int argc, char** argv)
 {
@@ -27,7 +31,7 @@ int main(int argc, char** argv)
         LOG("INFO") << "Version:" << version << std::endl;
         LOG("INFO") << "BuildNumber:" << version->buildNumber << std::endl;
         LOG("INFO") << "Description:" << version->description << std::endl;
-        std::cout << std::endl;
+        LOG("INFO") << std::endl;
 
         InferenceEngine::Core ie;
         //-------------------------------- 网络模型信息 --------------------------------
@@ -45,11 +49,12 @@ int main(int argc, char** argv)
             {
                 InferenceEngine::SizeVector inputDims = input.second->getTensorDesc().getDims();
 
-                std::stringstream shape; shape << "[";
-                for (int i = 0; i < inputDims.size(); i++)
-                    shape << inputDims[i] << (i != inputDims.size() - 1 ? "x" : "]");
+                //std::stringstream shape; shape << "[";
+                //for (int i = 0; i < inputDims.size(); i++)
+                //    shape << inputDims[i] << (i != inputDims.size() - 1 ? "x" : "]");
 
-                LOG("INFO") << "\tOutput Name:[" << input.first << "]  Shape:" << shape.str() << "  Precision:[" << input.second->getPrecision() << "]" << std::endl;
+                //LOG("INFO") << "\tOutput Name:[" << input.first << "]  Shape:" << shape.str() << "  Precision:[" << input.second->getPrecision() << "]" << std::endl;
+                LOG("INFO") << "\tOutput Name:[" << input.first << "]  Shape:" << inputDims << "  Precision:[" << input.second->getPrecision() << "]" << std::endl;
             }
 
             //------------Output-----------
@@ -58,25 +63,50 @@ int main(int argc, char** argv)
             for (const auto& output : outputsInfo)
             {
                 InferenceEngine::SizeVector outputDims = output.second->getTensorDesc().getDims();
-                std::stringstream shape; shape << "[";
-                for (int i = 0; i < outputDims.size(); i++)
-                    shape << outputDims[i] << (i != outputDims.size() - 1 ? "x" : "]");
+                //std::stringstream shape; shape << "[";
+                //for (int i = 0; i < outputDims.size(); i++)
+                //    shape << outputDims[i] << (i != outputDims.size() - 1 ? "x" : "]");
 
-                LOG("INFO") << "\tOutput Name:[" << output.first << "]  Shape:" << shape.str() << "  Precision:[" << output.second->getPrecision() << "]" << std::endl;
+                //LOG("INFO") << "\tOutput Name:[" << output.first << "]  Shape:" << shape.str() << "  Precision:[" << output.second->getPrecision() << "]" << std::endl;
+                LOG("INFO") << "\tOutput Name:[" << output.first << "]  Shape:" << outputDims << "  Precision:[" << output.second->getPrecision() << "]" << std::endl;
             }
 
-            std::cout << std::endl;
+            LOG("INFO") << std::endl;
         }
 
         //-------------------------------- 支持的硬件设备信息 --------------------------------
-        LOG("INFO") << "[Support Target Devices]";
-        std::vector<std::string> devices = ie.GetAvailableDevices();
-        for (const auto& device : devices)
+        LOG("INFO") << "[Support Target Devices]" << std::endl;
+        std::vector<std::string> availableDevices = ie.GetAvailableDevices();
+        std::set<std::string> printedDevices;
+
+        for (auto&& device : availableDevices)
         {
-            std::string deviceFullName = ie.GetMetric(device, METRIC_KEY(FULL_DEVICE_NAME)).as<std::string>();
-            LOG("INFO") << "[" << device << "] " << deviceFullName << std::endl;
+            std::string deviceFamilyName = device.substr(0, device.find_first_of('.'));
+            if (printedDevices.find(deviceFamilyName) == printedDevices.end())
+                printedDevices.insert(deviceFamilyName);
+            else
+                continue;
+
+            LOG("INFO") << "\tDevice: " << deviceFamilyName << std::endl;
+
+            LOG("INFO") << "\tMetrics: " << std::endl;
+            std::vector<std::string> supportedMetrics = ie.GetMetric(deviceFamilyName, METRIC_KEY(SUPPORTED_METRICS));
+            for (auto&& metricName : supportedMetrics)
+            {
+                LOG("INFO") << "\t\t" << metricName << " : " << std::flush;
+                PrintParameterValue(ie.GetMetric(device, metricName));
+            }
+
+            LOG("INFO") << "\tDefault values for device configuration keys: " << std::endl;
+            std::vector<std::string> supportedConfigKeys = ie.GetMetric(deviceFamilyName, METRIC_KEY(SUPPORTED_CONFIG_KEYS));
+            for (auto&& configKey : supportedConfigKeys)
+            {
+                LOG("INFO") << "\t\t" << configKey << " : " << std::flush;
+                PrintParameterValue(ie.GetConfig(deviceFamilyName, configKey));
+            }
+
+            LOG("INFO") << std::endl;
         }
-        std::cout << std::endl;
     }
     catch (const std::exception& ex)
     {
