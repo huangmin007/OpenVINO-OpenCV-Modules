@@ -100,7 +100,7 @@ namespace space
 	//推断完成回调对象
 	typedef InferenceEngine::IInferRequest::CompletionCallback	TCompletionCallback;
 	typedef std::function<void(InferenceEngine::InferRequest, InferenceEngine::StatusCode)>		FCompletionCallback;
-
+	typedef std::function<void(InferenceEngine::IInferRequest::Ptr, InferenceEngine::StatusCode)>		FPCompletionCallback;
 
 	/// <summary>
 	/// 开放模型推断基类，基于图像为输入源，异步推断，输出层内存映射共享
@@ -110,13 +110,40 @@ namespace space
 	{
 	public:
 		/// <summary>
+		/// OpenModelInferBase Params
+		/// </summary>
+		struct Params
+		{
+			size_t batch_size = 1;				//批处理大小
+			size_t infer_count = 1;				//创建的推断请求数量
+			bool is_shared_blob = true;			//是否共享映射指定的输出层数据
+			//IE 引擎插件配置
+			std::map<std::string, std::string> ie_config;
+
+			friend std::ostream& operator << (std::ostream& stream, const OpenModelInferBase::Params& params)
+			{
+				stream << "[BatchSize:" << params.batch_size <<
+					" InferCount:" << params.infer_count << std::boolalpha <<
+					" SharedBlob:" << params.is_shared_blob << "]";
+
+				return stream;
+			};
+		};
+
+		/// <summary>
 		/// 开放模型推断构造函数
 		/// </summary>
 		/// <param name="output_layer_names">需要指定的输出层名称，该参数用于有多层输出的网络</param>
 		/// <param name="is_debug"></param>
 		/// <returns></returns>
-		OpenModelInferBase(const std::vector<std::string> &output_layer_names, bool is_debug = true);
+		OpenModelInferBase(const std::vector<std::string>& output_layer_names, bool is_debug = true);
 		~OpenModelInferBase();
+
+		/// <summary>
+		/// 设置相关参数，需在 ConfigNetwork 之前设置
+		/// </summary>
+		/// <param name="params"></param>
+		void SetParameters(const Params& params);
 
 		/// <summary>
 		/// 配置网络模型
@@ -124,7 +151,7 @@ namespace space
 		/// <param name="ie">ie推断引擎对象</param>
 		/// <param name="model_info">具有一定协议格式的模型参数，格式：(模型名称[:精度[:硬件]])，示例：human-pose-estimation-0001:FP32:CPU</param>
 		/// <param name="is_reshape">是否重塑输入层，重新调整输入，指按原帧数据尺寸、数据指针位置做为输入(减少内存数据复制)，做异步推断请求</param>
-		void Configuration(InferenceEngine::Core& ie, const std::string& model_info, bool is_reshape = true);
+		void ConfigNetwork(InferenceEngine::Core& ie, const std::string& model_info, bool is_reshape = true);
 
 		/// <summary>
 		/// 配置网络模型
@@ -133,13 +160,39 @@ namespace space
 		/// <param name="model_path">ai模型文件路径</param>
 		/// <param name="device">推断使用的硬件类型</param>
 		/// <param name="is_reshape">是否重塑输入层，重新调整输入，指按原帧数据尺寸、数据指针位置做为输入(减少内存数据复制)，做异步推断请求</param>
-		void Configuration(InferenceEngine::Core& ie, const std::string& model_path, const std::string& device, bool is_reshape = true);
+		void ConfigNetwork(InferenceEngine::Core& ie, const std::string& model_path, const std::string& device, bool is_reshape = true);
 
 		/// <summary>
 		/// 异步推断请求，需实时提交图像帧；当 is_reshape 为 true 时只需调用一次，多次调用也不影响
 		/// </summary>
 		/// <param name="frame">图像帧对象</param>
 		void RequestInfer(const cv::Mat& frame);
+
+		/// <summary>
+		/// 设置推断完成回调
+		/// </summary>
+		/// <param name="callback"></param>
+		void SetCompletionCallback(FPCompletionCallback callback)
+		{
+			request_callback = callback;
+		}
+
+		/// <summary>
+		/// 获取当前对象的执行网络
+		/// </summary>
+		/// <returns></returns>
+		const InferenceEngine::ExecutableNetwork GetExecutableNetwork() const
+		{
+			return execNetwork;
+		}
+		/// <summary>
+		/// 获取共享输出层映射信息
+		/// </summary>
+		/// <returns></returns>
+		const std::vector<std::pair<std::string, LPVOID>> GetSharedOutputLayers() const
+		{
+			return shared_output_layers;
+		}
 
 		/// <summary>
 		/// 获取上一帧推断所用耗时 ms
@@ -161,27 +214,26 @@ namespace space
 			return fps;
 		}
 
-		
-
 	protected:
 
 		/// <summary>
-		/// 配置网络输入/输出
+		/// 设置网络输入/输出
 		/// </summary>
-		virtual void ConfigNetworkIO();
+		virtual void SetNetworkIO();
 
 		/// <summary>
 		/// 设置推断请求异步回调
 		/// </summary>
-		virtual void SetRequestCallback();
+		virtual void SetInferCallback();
 
 		/// <summary>
-		/// 创建内存共享，将指定的网络输出层数据共享 
+		/// 设置内存共享，将指定的网络输出层数据共享 
 		/// </summary>
-		virtual void CreateMemoryShared();
+		virtual void SetMemoryShared();
 
 		/// <summary>
 		/// 解析指定的输出层数据；也可做是二次输入/输出，或是调试显示输出
+		/// <param> 如果要在类内部解析，在子类内实现该函数；如果在类外部解析设置回调函数 SetCompletionCallback </param>
 		/// </summary>
 		virtual void ParsingOutputData(InferenceEngine::IInferRequest::Ptr request, InferenceEngine::StatusCode status) = 0;
 
@@ -190,8 +242,8 @@ namespace space
 		/// </summary>
 		virtual void UpdateDebugShow() = 0;
 
-
 		size_t batch_size = 1;				//批处理大小
+		size_t infer_count = 1;				//创建的推断请求数量
 		bool is_shared_blob = true;			//是否共享映射指定的输出层数据
 		bool is_configuration = false;		//是否已经设置网络配置
 		// IE 引擎插件配置
@@ -212,7 +264,10 @@ namespace space
 		//输出层数据信息
 		InferenceEngine::OutputsDataMap outputsInfo;
 		// 推断请求对象
-		InferenceEngine::InferRequest::Ptr requestPtr;
+		std::vector<InferenceEngine::InferRequest::Ptr> requestPtrs;
+
+		FPCompletionCallback request_callback;
+		//TCompletionCallback request_callback;
 
 		//引用输入的帧对象，主要是需要帧的宽，高，通道，类型、数据指针信息
 		cv::Mat frame_ptr;
@@ -249,14 +304,4 @@ namespace space
 
 	};
 
-	class Test :public OpenModelInferBase
-	{
-	public :
-		Test();
-		void Configuration() {
-			std::cout << "a" << std::endl;
-		}
-	protected:
-		void UpdateDebugShow() override;
-	};
 }

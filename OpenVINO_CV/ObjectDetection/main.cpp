@@ -5,6 +5,7 @@
 #include <fstream>
 #include "cmdline.h"
 #include "object_detection.hpp"
+#include "object_recognition.hpp"
 #include "static_functions.hpp"
 #include "input_source.hpp"
 
@@ -38,6 +39,7 @@ int main(int argc, char** argv)
     //face-detection-adas-0001,person-detection-retail-0013,face-detection-0105,boxes/Split.0:labels
     args.add<std::string>("output_layer_names", 'o', "(output layer name)多层网络输出参数，单层使用默认输出，网络层名称，以':'分割，区分大小写，格式：layerName:layerName:...", false, "boxes/Split.0:labels");
     args.add<float>("conf", 'c', "检测结果的置信度阈值(confidence threshold)", false, 0.5);
+    args.add<bool>("reshape", 'r', "重塑输入层，使输入源内存映射到网络输入层实现共享内存数据，不进行数据源缩放和拷贝", false, true);
 
     args.add<bool>("async", 0, "是否异步分析识别", false, true);
 #ifdef _DEBUG
@@ -66,7 +68,7 @@ int main(int argc, char** argv)
         return EXIT_SUCCESS;
     }
 
-    bool reshape = true;
+    bool reshape = args.get<bool>("reshape");
     bool show = args.get<bool>("show"); 
     float conf = args.get<float>("conf");
     std::map<std::string, std::string> model = ParseArgsForModel(args.get<std::string>("model"));
@@ -106,9 +108,17 @@ int main(int argc, char** argv)
     try
     {
         InferenceEngine::Core ie;
+
+        //Parent
         ObjectDetection detector(output_layer_names, show);
-        detector.Configuration(ie, args.get<std::string>("model"), reshape);
-        detector.SetParameters(conf, labels);
+        detector.SetParameters({}, conf, labels);
+        detector.ConfigNetwork(ie, args.get<std::string>("model"), reshape);
+
+        //Sub
+        ObjectRecognition recognition({}, show);
+        recognition.SetParameters({1, 16, true});
+        recognition.ConfigNetwork(ie, "facial-landmarks-35-adas-0002:FP32:CPU", false);
+        recognition.SetParentNetwork(&detector);
 
         inputSource.read(frame);
         detector.RequestInfer(frame);

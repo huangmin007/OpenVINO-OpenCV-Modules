@@ -33,7 +33,7 @@ int main(int argc, char **argv)
     args.add<std::string>("model", 'm', "用于 AI识别检测 的 网络模型名称/文件(.xml)和目标设备，格式：(AI模型名称)[:精度[:硬件]]，"
         "示例：human-pose-estimation-0001:FP32:CPU 或 human-pose-estimation-0001:FP16:GPU", false, "human-pose-estimation-0001:FP32:CPU");
 
-    args.add<bool>("reshape", 'r', "重塑输入层，使输入源内存映射到网络输入层实现共享内存数据，不进行数据缩放源", false, true);
+    args.add<bool>("reshape", 'r', "重塑输入层，使输入源内存映射到网络输入层实现共享内存数据，不进行数据源缩放和拷贝", false, true);
 
 #ifdef _DEBUG
     args.add<bool>("show", 0, "是否显示视频窗口，用于调试", false, true);
@@ -79,13 +79,9 @@ int main(int argc, char **argv)
     try
     {
         InferenceEngine::Core ie;
-        HumanPoseDetection detector(output_layer_names, !show);
-#if USE_MULTI_INFER
-        detector.Configuration(ie, args.get<std::string>("model"), true, 1);
-#else
-        detector.Configuration(ie, args.get<std::string>("model"), false);
-#endif
-        std::map<std::string, std::string> model = ParseArgsForModel(args.get<std::string>("model"));
+        HumanPoseDetection detector(output_layer_names, show);
+        //detector.SetParameters({ 1, 1, true, {} });
+        detector.ConfigNetwork(ie, args.get<std::string>("model"), reshape);
 
         inputSource.read(frame);
         detector.RequestInfer(frame);

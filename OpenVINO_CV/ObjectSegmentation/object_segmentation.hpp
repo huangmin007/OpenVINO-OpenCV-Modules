@@ -23,10 +23,11 @@ namespace space
 		/// <param name="output_layer_names">多层的网络输出名称</param>
 		/// <param name="is_debug"></param>
 		/// <returns></returns>
-		ObjectSegmentation(const std::vector<std::string>& output_layer_names, bool is_debug = false);
+		ObjectSegmentation(const std::vector<std::string>& output_layer_names, bool is_debug = true);
 		~ObjectSegmentation();
 
 	protected:
+		void ParsingOutputData(InferenceEngine::IInferRequest::Ptr request, InferenceEngine::StatusCode status) override;
 		void UpdateDebugShow() override;
 
 	private:

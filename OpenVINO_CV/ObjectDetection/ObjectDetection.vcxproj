@@ -148,9 +148,11 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="object_detection.cpp" />
+    <ClCompile Include="object_recognition.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="object_detection.hpp" />
+    <ClInclude Include="object_recognition.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

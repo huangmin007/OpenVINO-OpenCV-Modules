@@ -12,8 +12,10 @@ namespace space
 	
 	ObjectDetection::~ObjectDetection(){};
 
-	void ObjectDetection::SetParameters(double confidence_threshold, const std::vector<std::string> labels)
+	void ObjectDetection::SetParameters(const OpenModelInferBase::Params &params, double confidence_threshold, const std::vector<std::string> labels)
 	{
+		OpenModelInferBase::SetParameters(params);
+
 		this->labels = labels;
 		this->confidence_threshold = confidence_threshold;
 	}
@@ -178,6 +180,8 @@ namespace space
 	
 	void ObjectDetection::UpdateDebugShow()
 	{
+		if (debug_frame.empty()) return;
+
 		DrawObjectBound(debug_frame, results, labels);
 
 		std::stringstream use_time;

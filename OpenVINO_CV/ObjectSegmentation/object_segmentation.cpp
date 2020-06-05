@@ -10,32 +10,14 @@
 
 namespace space
 {
-	ObjectSegmentation::ObjectSegmentation(const std::vector<std::string>& output_layer_names, bool is_debug) :OpenModelInferBase(output_layer_names, is_debug){};
+	ObjectSegmentation::ObjectSegmentation(const std::vector<std::string>& output_layer_names, bool is_debug) 
+		:OpenModelInferBase(output_layer_names, is_debug){};
 	ObjectSegmentation::~ObjectSegmentation()
 	{
 	};
 
-	void ObjectSegmentation::UpdateDebugShow()
+	void ObjectSegmentation::ParsingOutputData(InferenceEngine::IInferRequest::Ptr request, InferenceEngine::StatusCode status)
 	{
-		static bool debug_track = false;
-		if (!debug_track) 
-		{
-			cv::namedWindow(debug_title.str());
-			int initValue = static_cast<int>(blending * 100);
-
-			cv::createTrackbar("blending", debug_title.str(), &initValue, 100,
-				[](int position, void* blendingPtr) 
-				{
-					*static_cast<float*>(blendingPtr) = position * 0.01f; 
-				},
-				&blending);
-
-			debug_track = true;
-		}
-
-		int frame_width = frame_ptr.cols;
-		int frame_height = frame_ptr.rows;
-
 		//µ¥²ãÊä³ö
 		//[B,H,W] = [1,H,W]
 		//[B,C,H,W] = [1,3,H,W]
@@ -106,17 +88,40 @@ namespace space
 				}
 			}
 
-			cv::resize(mask_img, resize_img, cv::Size(frame_width, frame_height));
-			resize_img = frame_ptr * blending + resize_img * (1 - blending);
-
-			std::stringstream use_time;
-			use_time << "Infer Use Time:" << GetInferUseTime() << "ms";
-			cv::putText(resize_img, use_time.str(), cv::Point(10, 25), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 0, 0), 2);
-
-			cv::imshow(debug_title.str(), resize_img);
-			cv::waitKey(1);
-
-			return;
+			if (is_debug) UpdateDebugShow();
 		}
+	}
+
+	void ObjectSegmentation::UpdateDebugShow()
+	{
+		static bool debug_track = false;
+		if (!debug_track)
+		{
+			cv::namedWindow(debug_title.str());
+			int initValue = static_cast<int>(blending * 100);
+
+			cv::createTrackbar("blending", debug_title.str(), &initValue, 100,
+				[](int position, void* blendingPtr)
+				{
+					*static_cast<float*>(blendingPtr) = position * 0.01f;
+				},
+				&blending);
+
+			debug_track = true;
+		}
+
+		//int frame_width = frame_ptr.cols;
+		//int frame_height = frame_ptr.rows;
+
+		cv::resize(mask_img, resize_img, frame_ptr.size());// cv::Size(frame_width, frame_height));
+		resize_img = frame_ptr * blending + resize_img * (1 - blending);
+
+		std::stringstream use_time;
+		use_time << "Infer Use Time:" << GetInferUseTime() << "ms" << "  FPS:" << GetFPS();
+		cv::putText(resize_img, use_time.str(), cv::Point(10, 25), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 0, 0), 2);
+
+		cv::imshow(debug_title.str(), resize_img);
+		cv::waitKey(1);
+
 	}
 }

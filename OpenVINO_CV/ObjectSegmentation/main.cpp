@@ -85,7 +85,7 @@ int main(int argc, char **argv)
     {
         InferenceEngine::Core ie;
         ObjectSegmentation detector(output_layer_names, show);
-        detector.Configuration(ie, args.get<std::string>("model"), reshape);
+        detector.ConfigNetwork(ie, args.get<std::string>("model"), reshape);
 
         inputSource.read(frame);
         detector.RequestInfer(frame);
@@ -96,7 +96,6 @@ int main(int argc, char **argv)
         std::stringstream use_time;
 
         int delay = 40;
-        double infer_use_time = 0.0f;
         double frame_use_time = 0.0f;
         auto t0 = std::chrono::high_resolution_clock::now();
         auto t1 = std::chrono::high_resolution_clock::now();
@@ -106,10 +105,8 @@ int main(int argc, char **argv)
             if (!IsRunning) break;
             t0 = std::chrono::high_resolution_clock::now();
 
-            infer_use_time = detector.GetInferUseTime();
-
             use_time.str("");
-            use_time << "Infer/Frame Use Time:" << infer_use_time << "/" <<  frame_use_time << "ms  FPS:" << detector.GetFPS();
+            use_time << "Infer/Frame Use Time:" << detector.GetInferUseTime() << "/" <<  frame_use_time << "ms  FPS:" << detector.GetFPS();
             std::cout << "\33[2K\r[ INFO] " << use_time.str();
 
             if (show)

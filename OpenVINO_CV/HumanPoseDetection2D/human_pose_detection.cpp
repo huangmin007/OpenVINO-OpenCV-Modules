@@ -192,7 +192,7 @@ namespace space
         
         ConvertToSharedXML(poses, "pose2d_output.bin");
 
-        if (is_debug)UpdateDebugShow();
+        if (is_debug) UpdateDebugShow();
     }
     
     void HumanPoseDetection::ConvertToSharedXML(const std::vector<HumanPose>& poses, const std::string shared_name)
@@ -201,7 +201,7 @@ namespace space
 
         if (!has_shared)
         {
-            std::cout << std::endl;
+            LOG("INFO") << std::endl;
             if (CreateOnlyWriteMapFile(pMapFile, pBuffer, 1024 * 1024 * 2, shared_name.c_str()))
                 osd_data = (OutputSourceData*)pBuffer;
             else

@@ -132,7 +132,7 @@ namespace space
 			}
 
 			LOG("INFO") << "Input Source Video: [URL:" << input[1] << ", Size:" << capture.get(cv::CAP_PROP_FRAME_WIDTH)
-				<< "x" << capture.get(cv::CAP_PROP_FRAME_HEIGHT) << "]" << std::endl;
+				<< "x" << capture.get(cv::CAP_PROP_FRAME_HEIGHT) << ", Frame:" << capture.get(cv::CAP_PROP_FRAME_COUNT) << "]" << std::endl;
 		}
 		else if (input[0] == "share" || input[0] == "shared")
 		{
@@ -223,6 +223,9 @@ namespace space
 			{
 				vsd_data->fid = 0;
 				capture.open(video_url);
+
+				isReadOK = capture.read(frame);
+				frame.data = (uint8_t*)output_buffer + VSD_SIZE;
 				isReadOK = capture.read(frame);
 			}
 			

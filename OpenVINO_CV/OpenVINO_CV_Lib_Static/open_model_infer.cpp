@@ -15,7 +15,7 @@ namespace space
 	{
 		timer.stop();
 
-		LOG("INFO") << "正在关闭/清理共享内存  ... " << std::endl;
+		LOG("INFO") << "OpenModelInferBase 正在关闭/清理共享内存  ... " << std::endl;
 		for (auto& shared : shared_output_layers)
 		{
 			UnmapViewOfFile(shared.second);
@@ -31,18 +31,37 @@ namespace space
 		shared_output_layers.clear();
 	}
 
-	void OpenModelInferBase::Configuration(InferenceEngine::Core& ie, const std::string& model_info, bool is_reshape)
+	void OpenModelInferBase::SetParameters(const Params& params)
+	{
+		if (is_configuration)
+			throw std::logic_error("需要在网络配置之前设置参数 ... ");
+
+		this->batch_size = params.batch_size;
+		this->infer_count = params.infer_count;
+		this->is_shared_blob = params.is_shared_blob;
+		
+		for (auto& kv : params.ie_config)
+			this->ie_config[kv.first] = kv.second;
+
+		LOG("INFO") << "Parameters:" << params << std::endl;
+	}
+
+	void OpenModelInferBase::ConfigNetwork(InferenceEngine::Core& ie, const std::string& model_info, bool is_reshape)
 	{
 		std::map<std::string, std::string> model = ParseArgsForModel(model_info);
-		return Configuration(ie, model["path"], model["device"], is_reshape);
+		return ConfigNetwork(ie, model["path"], model["device"], is_reshape);
 	}
-	void OpenModelInferBase::Configuration(InferenceEngine::Core& ie, const std::string& model_path, const std::string& device, bool is_reshape)
+	void OpenModelInferBase::ConfigNetwork(InferenceEngine::Core& ie, const std::string& model_path, const std::string& device, bool is_reshape)
 	{
 		if (batch_size < 1) 
 			throw std::invalid_argument("Batch Size 不能小于 1 .");
+		if (infer_count < 1)
+			throw std::invalid_argument("Infer Request 数量不能小于 1 .");
 
 		if (batch_size > 1)
 			ie_config[InferenceEngine::PluginConfigParams::KEY_DYN_BATCH_ENABLED] = InferenceEngine::PluginConfigParams::YES;
+		if(infer_count > 1)
+			ie_config[InferenceEngine::PluginConfigParams::KEY_CPU_BIND_THREAD] = InferenceEngine::PluginConfigParams::NO;
 
 		this->is_reshape = is_reshape;
 		LOG("INFO") << "正在配置网络模型 ... " << std::endl;
@@ -53,28 +72,32 @@ namespace space
 		cnnNetwork.setBatchSize(batch_size);
 
 		//2.
-		ConfigNetworkIO();	//配置网络输入/输出
+		SetNetworkIO();	//配置网络输入/输出
 
 		//3.
 		LOG("INFO") << "正在创建可执行网络 ... " << std::endl;
 		execNetwork = ie.LoadNetwork(cnnNetwork, device, ie_config);
 		LOG("INFO") << "正在创建推断请求对象 ... " << std::endl;
-		requestPtr = execNetwork.CreateInferRequestPtr();
+		for (int i = 0; i < infer_count; i++)
+		{
+			InferenceEngine::InferRequest::Ptr inferPtr = execNetwork.CreateInferRequestPtr();
+			requestPtrs.push_back(inferPtr);
+		}
 
 		//4.
 		LOG("INFO") << "正在配置异步推断回调 ... " << std::endl;
-		SetRequestCallback();	//设置异步回调
+		SetInferCallback();	//设置异步回调
 		//5.
 		LOG("INFO") << "正在创建/映射共享内存 ... " << std::endl;
-		CreateMemoryShared();	//创建内存共享
+		SetMemoryShared();	//创建内存共享
 
 		is_configuration = true;
 		LOG("INFO") << "网络模型配置完成 ... " << std::endl;
 	}
 
-	void OpenModelInferBase::ConfigNetworkIO()
+	void OpenModelInferBase::SetNetworkIO()
 	{
-		LOG("INFO") << "\t配置网络输入 ... " << std::endl;
+		LOG("INFO") << "\t配置网络输入 ... Reshape:[" << std::boolalpha << is_reshape << "]" << std::endl;
 		inputsInfo = cnnNetwork.getInputsInfo();
 		inputsInfo.begin()->second->setPrecision(InferenceEngine::Precision::U8);
 		if (is_reshape)
@@ -87,7 +110,7 @@ namespace space
 		for (const auto& input : inputsInfo)
 		{
 			InferenceEngine::SizeVector inputDims = input.second->getTensorDesc().getDims();
-			LOG("INFO") << "\Input Name:[" << input.first << "]  Shape:" << inputDims << "  Precision:[" << input.second->getPrecision() << "]" << std::endl;
+			LOG("INFO") << "\tInput Name:[" << input.first << "]  Shape:" << inputDims << "  Precision:[" << input.second->getPrecision() << "]" << std::endl;
 		}
 
 		//默认支持一层输入，子类可以更改为多层输入
@@ -155,38 +178,47 @@ namespace space
 		debug_title << "[" << cnnNetwork.getName() << "] Output Size:" << outputsInfo.size() << "  Name:[" << shared_layers_info.begin()->first << "]  Shape:" << outputDims << std::endl;
 	}
 
-	void OpenModelInferBase::SetRequestCallback()
+	void OpenModelInferBase::SetInferCallback()
 	{
-		requestPtr->SetCompletionCallback<FCompletionCallback>((FCompletionCallback)
-			[&](InferenceEngine::IInferRequest::Ptr request, InferenceEngine::StatusCode code)
-			{
+		for (auto &requestPtr:requestPtrs)
+		{
+			requestPtr->SetCompletionCallback<FCompletionCallback>((FCompletionCallback)
+				[&](InferenceEngine::IInferRequest::Ptr request, InferenceEngine::StatusCode code)
 				{
-					t1 = std::chrono::high_resolution_clock::now();
-					std::lock_guard<std::shared_mutex> lock(_time_mutex);
-					infer_use_time = std::chrono::duration_cast<ms>(t1 - t0).count();
-				};
-				{
-					std::lock_guard<std::shared_mutex> lock(_fps_mutex);
-					fps_count++;
-				};
+					{
+						t1 = std::chrono::high_resolution_clock::now();
+						std::lock_guard<std::shared_mutex> lock(_time_mutex);
+						infer_use_time = std::chrono::duration_cast<ms>(t1 - t0).count();
+					};
+					{
+						std::lock_guard<std::shared_mutex> lock(_fps_mutex);
+						fps_count++;
+					};
 
-				//1.解析数据
-				ParsingOutputData(request, code);
+					//1.解析数据，外部解析 OR 内部解析
+					if (request_callback != nullptr)
+					{
+						std::cout << "callback ... " << std::endl;
+						request_callback(request, code);
+					}
+					else
+						ParsingOutputData(request, code);
 
-				//2.循环再次启动异步推断
-				if (!this->is_reshape)
-				{
-					InferenceEngine::Blob::Ptr inputBlob;
-					request->GetBlob(inputsInfo.begin()->first.c_str(), inputBlob, 0);
-					MatU8ToBlob<uint8_t>(frame_ptr, inputBlob);
-				};
-				request->StartAsync(0);
-				t0 = std::chrono::high_resolution_clock::now();
+					//2.循环再次启动异步推断
+					if (!this->is_reshape)
+					{
+						InferenceEngine::Blob::Ptr inputBlob;
+						request->GetBlob(inputsInfo.begin()->first.c_str(), inputBlob, 0);
+						MatU8ToBlob<uint8_t>(frame_ptr, inputBlob);
+					};
+					//request->SetBatch(batch_size, 0);
+					request->StartAsync(0);
+					t0 = std::chrono::high_resolution_clock::now();
 
-				//3.更新显示结果
-				if (is_debug) UpdateDebugShow();
-			});
-
+					//3.更新显示结果
+					if (is_debug) UpdateDebugShow();
+				});
+		}
 		timer.start(1000, [&]
 			{
 #if _TEST
@@ -203,7 +235,7 @@ namespace space
 			});
 	}
 	
-	void OpenModelInferBase::CreateMemoryShared()
+	void OpenModelInferBase::SetMemoryShared()
 	{
 		for (const auto& shared : shared_layers_info)
 		{
@@ -216,8 +248,13 @@ namespace space
 
 				//将输出层映射到内存共享
 				//重新设置指定输出层 Blob, 将指定输出层数据指向为共享指针，实现该层数据共享
-				if(is_shared_blob)
-					MemorySharedBlob(requestPtr, shared_output_layers.back());
+				if(is_shared_blob && infer_count == 1)
+					MemorySharedBlob(requestPtrs[0], shared_output_layers.back());
+				
+				// 多个推断对象，输出映射到同一个共享位置？？
+				//	if(is_shared_blob)
+				//		for(auto &requestPtr:requestPtrs)
+				//			MemorySharedBlob(requestPtr, shared_output_layers.back());
 			}
 			else
 			{
@@ -235,10 +272,22 @@ namespace space
 			throw std::logic_error("输入图像帧不能为空帧对象，CV_8UC3 类型 ... ");
 
 		frame_ptr = frame;
-		InferenceEngine::StatusCode code = requestPtr->Wait(InferenceEngine::IInferRequest::WaitMode::STATUS_ONLY);
-		//推断没有启动就继续往下执行
-		if (code != InferenceEngine::StatusCode::INFER_NOT_STARTED)	return;
+		InferenceEngine::StatusCode code;
+		InferenceEngine::InferRequest::Ptr requestPtr;
 
+		//查找没有启动的推断对象
+		for (auto& request : requestPtrs)
+		{
+			code = request->Wait(InferenceEngine::IInferRequest::WaitMode::STATUS_ONLY);
+			if (code == InferenceEngine::StatusCode::INFER_NOT_STARTED)
+			{
+				requestPtr = request;
+				break;
+			}
+		}
+		if (requestPtr == nullptr) return;
+
+		LOG("INFO") << "找到一个 InferRequestPtr 对象，Input Address:" << (void*)requestPtr->GetBlob(inputsInfo.begin()->first)->buffer().as<uint8_t*>() << std::endl;
 		if (is_reshape)
 		{
 			size_t width = frame.cols;
@@ -263,6 +312,7 @@ namespace space
 			MatU8ToBlob<uint8_t>(frame, inputBlob);
 		}
 		
+		//requestPtr->SetBatch(batch_size);
 		requestPtr->StartAsync();
 		t0 = std::chrono::high_resolution_clock::now();
 	}

@@ -43,7 +43,7 @@ namespace space
 		/// </summary>
 		/// <param name="confidence_threshold">信任阈值</param>
 		/// <param name="labels">对象标签</param>
-		void SetParameters(double confidence_threshold, const std::vector<std::string> labels);
+		void SetParameters(const OpenModelInferBase::Params& params, double confidence_threshold, const std::vector<std::string> labels);
 
 	protected:
 		void ParsingOutputData(InferenceEngine::IInferRequest::Ptr request, InferenceEngine::StatusCode status) override;
