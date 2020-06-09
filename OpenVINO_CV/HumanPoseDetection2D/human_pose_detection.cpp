@@ -152,11 +152,11 @@ namespace space
     {
         if (outputsInfo.size() != 2) return;
         
-        InferenceEngine::Blob::Ptr pafsBlob;// = request->GetBlob(shared_output_layers[0].first);
-        request->GetBlob(shared_output_layers[0].first.c_str(), pafsBlob, 0);
+        InferenceEngine::Blob::Ptr pafsBlob;// = request->GetBlob(output_shared_layers[0].first);
+        request->GetBlob(output_shared_layers[0].first.c_str(), pafsBlob, 0);
 
-        InferenceEngine::Blob::Ptr heatMapsBlob;// = request->GetBlob(shared_output_layers[1].first);
-        request->GetBlob(shared_output_layers[1].first.c_str(), heatMapsBlob, 0);
+        InferenceEngine::Blob::Ptr heatMapsBlob;// = request->GetBlob(output_shared_layers[1].first);
+        request->GetBlob(output_shared_layers[1].first.c_str(), heatMapsBlob, 0);
 
         InferenceEngine::SizeVector heatMapDims = heatMapsBlob->getTensorDesc().getDims();
         

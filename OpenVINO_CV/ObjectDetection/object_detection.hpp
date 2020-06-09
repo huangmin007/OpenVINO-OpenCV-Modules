@@ -7,11 +7,11 @@
 #include <inference_engine.hpp>
 
 #include "open_model_infer.hpp"
-//#include "open_model_multi_infer.hpp"
-
+#include "object_recognition.hpp"
 
 namespace space
 {
+	class ObjectRecognition;
 
 #pragma region ObjectDetection
 	/// <summary>
@@ -35,7 +35,7 @@ namespace space
 		/// <param name="output_layers_name">多层的网络输出名称</param>
 		/// <param name="is_debug"></param>
 		/// <returns></returns>
-		ObjectDetection(const std::vector<std::string> &output_layers_name, bool is_debug = true);
+		ObjectDetection(const std::vector<std::string>& output_layers_name, bool is_debug = true);
 		~ObjectDetection();
 
 		/// <summary>
@@ -45,25 +45,48 @@ namespace space
 		/// <param name="labels">对象标签</param>
 		void SetParameters(const OpenModelInferBase::Params& params, double confidence_threshold, const std::vector<std::string> labels);
 
+		static void DrawObjectBound(cv::Mat frame, const std::vector<ObjectDetection::Result>& results, const std::vector<std::string>& labels);
+
+		void AddSubNetwork(ObjectRecognition* sub_network);
+
 	protected:
 		void ParsingOutputData(InferenceEngine::IInferRequest::Ptr request, InferenceEngine::StatusCode status) override;
 		void UpdateDebugShow() override;
 
 	private:
-		/// <summary>
-		/// 绘制对象边界
-		/// </summary>
-		/// <param name="frame"></param>
-		/// <param name="results"></param>
-		/// <param name="labels"></param>
-		void DrawObjectBound(cv::Mat frame, const std::vector<ObjectDetection::Result>& results, const std::vector<std::string>& labels);
-		
+
 		cv::Mat debug_frame;
 		std::vector<std::string> labels;
 		double confidence_threshold = 0.5f;
 
+		std::vector<ObjectRecognition*> sub_network;
 		std::vector<ObjectDetection::Result> results;
 	};
-
 #pragma endregion
-}
+
+#pragma region ObjectRecognition
+	/// <summary>
+	/// Object Recognition 对象识别 (Open Model Zoo)
+	/// </summary>
+	class ObjectRecognition : public OpenModelInferBase
+	{
+	public:
+		ObjectRecognition(const std::vector<std::string>& output_layers_name, bool is_debug = true);
+		~ObjectRecognition();
+
+		void RequestInfer(const cv::Mat& frame, const std::vector<ObjectDetection::Result> results);
+
+
+	protected:
+		void ParsingOutputData(InferenceEngine::IInferRequest::Ptr request, InferenceEngine::StatusCode status) override;
+		void UpdateDebugShow() override;
+
+		void SetInferCallback() override;
+
+	private:
+		cv::Mat prev_frame;
+		std::vector<ObjectDetection::Result> results;
+		std::vector<ObjectDetection::Result> prev_results;
+	};
+#pragma endregion
+};

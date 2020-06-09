@@ -59,8 +59,8 @@ int main(int argc, char **argv)
 
     args.add<bool>("show", 0, "是否显示视频窗口，用于调试", false, true);
 #else
-    args.add<std::string>("m_hp", 0, "用于<头部姿态检测>的网络模型文件(.xml)和目标设备，格式：(AI模型名称[:精度[:硬件]])", false, "head-pose-estimation-adas-0001:FP16:GPU");
-    args.add<std::string>("m_lm", 0, "用于<人脸标记检测>的网络模型文件(.xml)和目标设备，格式：(AI模型名称[:精度[:硬件]])", false, "facial-landmarks-35-adas-0002:FP16:GPU");
+    args.add<std::string>("m_hp", 0, "用于<头部姿态检测>的网络模型文件(.xml)和目标设备，格式：(AI模型名称[:精度[:硬件]])", false, "head-pose-estimation-adas-0001:FP16:CPU");
+    args.add<std::string>("m_lm", 0, "用于<人脸标记检测>的网络模型文件(.xml)和目标设备，格式：(AI模型名称[:精度[:硬件]])", false, "facial-landmarks-35-adas-0002:FP16:CPU");
 
     args.add<bool>("show", 0, "是否显示视频窗口，用于调试", false, false);
 #endif
@@ -78,7 +78,7 @@ int main(int argc, char **argv)
     }
     if (args.exist("info"))
     {
-        InferenceEngineInfomation();
+        InferenceEngineInfomation(args.get<std::string>("model"));
         return EXIT_SUCCESS;
     }
     if (!isParser)

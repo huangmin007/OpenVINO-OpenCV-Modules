@@ -35,11 +35,14 @@ int main(int argc, char** argv)
 
     args.add<std::string>("input", 'i', "输入源参数，格式：(video|camera|shared)[:value[:value[:...]]]", false, "camera:0:1280x720");
     args.add<std::string>("model", 'm', "用于 AI识别检测 的 网络模型名称/文件(.xml)和目标设备，格式：(AI模型名称)[:精度[:硬件]]，"
-        "示例：face-detection-adas-0001:FP32:CPU 或 face-detection-adas-0001:FP16:GPU", false, "face-detection-0105:FP32:CPU");
+        "示例：face-detection-adas-0001:FP32:CPU 或 face-detection-adas-0001:FP16:GPU", false, "face-detection-adas-0001:FP32:CPU");
     //face-detection-adas-0001,person-detection-retail-0013,face-detection-0105,boxes/Split.0:labels
-    args.add<std::string>("output_layer_names", 'o', "(output layer name)多层网络输出参数，单层使用默认输出，网络层名称，以':'分割，区分大小写，格式：layerName:layerName:...", false, "boxes/Split.0:labels");
+    args.add<std::string>("output_layers", 'o', "(output layer names)多层网络输出参数，单层使用默认输出，网络层名称，以':'分割，区分大小写，格式：layerName:layerName:...", false, "");
     args.add<float>("conf", 'c', "检测结果的置信度阈值(confidence threshold)", false, 0.5);
     args.add<bool>("reshape", 'r', "重塑输入层，使输入源内存映射到网络输入层实现共享内存数据，不进行数据源缩放和拷贝", false, true);
+
+    args.add<std::string>("m0", 0, "用于 AI识别检测 的 联级网络模型名称/文件(.xml)和目标设备", false, 
+        "landmarks-regression-retail-0009:FP32:CPU,head-pose-estimation-adas-0001:FP32:CPU");
 
     args.add<bool>("async", 0, "是否异步分析识别", false, true);
 #ifdef _DEBUG
@@ -72,7 +75,7 @@ int main(int argc, char** argv)
     bool show = args.get<bool>("show"); 
     float conf = args.get<float>("conf");
     std::map<std::string, std::string> model = ParseArgsForModel(args.get<std::string>("model"));
-    std::vector<std::string> output_layer_names = SplitString(args.get<std::string>("output_layer_names"), ':');
+    std::vector<std::string> output_layers = SplitString(args.get<std::string>("output_layers"), ':');
 
 #pragma region ReadLebels
     std::vector<std::string> labels;    
@@ -110,15 +113,24 @@ int main(int argc, char** argv)
         InferenceEngine::Core ie;
 
         //Parent
-        ObjectDetection detector(output_layer_names, show);
+        ObjectDetection detector(output_layers, show);
         detector.SetParameters({}, conf, labels);
         detector.ConfigNetwork(ie, args.get<std::string>("model"), reshape);
 
         //Sub
-        ObjectRecognition recognition({}, show);
-        recognition.SetParameters({1, 16, true});
-        recognition.ConfigNetwork(ie, "facial-landmarks-35-adas-0002:FP32:CPU", false);
-        recognition.SetParentNetwork(&detector);
+        //std::vector<std::string> model_infos = SplitString(args.get<std::string>("m0"), ',');
+        std::vector<std::string> model_infos = {
+            //"facial-landmarks-35-adas-0002:FP32:CPU",
+            "landmarks-regression-retail-0009:FP32:CPU",
+            //"head-pose-estimation-adas-0001:FP32:CPU",
+        };
+        for (int i = 0; i < model_infos.size(); i++)
+        {
+            ObjectRecognition* recognition = new ObjectRecognition({}, show);
+            recognition->SetParameters({ 8, 1, true });
+            recognition->ConfigNetwork(ie, model_infos[i], false);
+            detector.AddSubNetwork(recognition);
+        }
 
         inputSource.read(frame);
         detector.RequestInfer(frame);

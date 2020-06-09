@@ -10,6 +10,8 @@
 #include "timer.hpp"
 #define _TEST false
 
+#define SHARED_RESERVE_BYTE_SIZE 32
+
 namespace space
 {
 
@@ -114,17 +116,19 @@ namespace space
 		/// </summary>
 		struct Params
 		{
-			size_t batch_size = 1;				//批处理大小
+			size_t batch_size = 1;				//设置批处理大小
 			size_t infer_count = 1;				//创建的推断请求数量
-			bool is_shared_blob = true;			//是否共享映射指定的输出层数据
+			bool is_mapping_blob = true;		//是否共享映射指定的输出层数据
 			//IE 引擎插件配置
 			std::map<std::string, std::string> ie_config;
+			//设置推断完成外部回调
+			FPCompletionCallback request_callback = nullptr;	
 
 			friend std::ostream& operator << (std::ostream& stream, const OpenModelInferBase::Params& params)
 			{
 				stream << "[BatchSize:" << params.batch_size <<
 					" InferCount:" << params.infer_count << std::boolalpha <<
-					" SharedBlob:" << params.is_shared_blob << "]";
+					" SharedBlob:" << params.is_mapping_blob << "]";
 
 				return stream;
 			};
@@ -169,15 +173,6 @@ namespace space
 		void RequestInfer(const cv::Mat& frame);
 
 		/// <summary>
-		/// 设置推断完成回调
-		/// </summary>
-		/// <param name="callback"></param>
-		void SetCompletionCallback(FPCompletionCallback callback)
-		{
-			request_callback = callback;
-		}
-
-		/// <summary>
 		/// 获取当前对象的执行网络
 		/// </summary>
 		/// <returns></returns>
@@ -191,7 +186,7 @@ namespace space
 		/// <returns></returns>
 		const std::vector<std::pair<std::string, LPVOID>> GetSharedOutputLayers() const
 		{
-			return shared_output_layers;
+			return output_shared_layers;
 		}
 
 		/// <summary>
@@ -244,7 +239,7 @@ namespace space
 
 		size_t batch_size = 1;				//批处理大小
 		size_t infer_count = 1;				//创建的推断请求数量
-		bool is_shared_blob = true;			//是否共享映射指定的输出层数据
+		bool is_mapping_blob = true;		//是否共享映射指定的输出层数据
 		bool is_configuration = false;		//是否已经设置网络配置
 		// IE 引擎插件配置
 		std::map<std::string, std::string> ie_config = { };
@@ -267,12 +262,11 @@ namespace space
 		std::vector<InferenceEngine::InferRequest::Ptr> requestPtrs;
 
 		FPCompletionCallback request_callback;
-		//TCompletionCallback request_callback;
 
 		//引用输入的帧对象，主要是需要帧的宽，高，通道，类型、数据指针信息
 		cv::Mat frame_ptr;
 		//用于操作共享层的数据，网络层名称/内存映射视图指针
-		std::vector<std::pair<std::string, LPVOID>> shared_output_layers;
+		std::vector<std::pair<std::string, LPVOID>> output_shared_layers;
 		
 		//用于测量的计时器
 		Timer timer;
@@ -281,19 +275,19 @@ namespace space
 		size_t fps_count = 0;
 		std::shared_mutex _fps_mutex;
 
-	private:
-
-		//需要指定的输出层名称，该参数用于有多层输出的网络
-		std::vector<std::string> output_layers;
-		std::vector<HANDLE> shared_output_handle;	//共享内存文件句柄
-		//用于创建内存共享的信息，指定的网络输出层名称/分配存储空间大小
-		std::vector<std::pair<std::string, size_t>> shared_layers_info;
-
 		//获取到推断结果所耗时间
 		double infer_use_time = 0.0f;
 		std::shared_mutex _time_mutex;
 		std::chrono::steady_clock::time_point t0;
 		std::chrono::steady_clock::time_point t1;
+
+	private:
+
+		//需要指定的输出层名称，该参数用于有多层输出的网络
+		std::vector<std::string> output_layers;
+		std::vector<HANDLE> output_shared_handle;	//共享内存文件句柄
+		//用于创建内存共享的信息，指定的网络输出层名称/分配存储空间大小
+		std::vector<std::pair<std::string, size_t>> shared_layers_info;
 
 #if _TEST
 		//用于测量 Timer 的准确性变量

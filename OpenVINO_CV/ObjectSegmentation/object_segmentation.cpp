@@ -21,7 +21,7 @@ namespace space
 		//µ¥²ãÊä³ö
 		//[B,H,W] = [1,H,W]
 		//[B,C,H,W] = [1,3,H,W]
-		if (shared_output_layers.size() == 1)
+		if (output_shared_layers.size() == 1)
 		{
 			int width, height, channels;
 			InferenceEngine::SizeVector outputSizeVector = outputsInfo.begin()->second->getTensorDesc().getDims();
@@ -43,7 +43,9 @@ namespace space
 				return;
 			}
 
-			const float* buffer = (float*)shared_output_layers.begin()->second;
+			InferenceEngine::Blob::Ptr data;
+			request->GetBlob(output_shared_layers.begin()->first.c_str(), data, 0);
+			const float* buffer = data->buffer().as<float*>();
 
 			if (mask_img.empty())
 				mask_img.create(height, width, CV_8UC3);

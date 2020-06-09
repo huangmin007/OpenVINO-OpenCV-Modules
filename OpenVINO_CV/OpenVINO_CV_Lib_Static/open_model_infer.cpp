@@ -6,8 +6,8 @@
 
 namespace space
 {
-	OpenModelInferBase::OpenModelInferBase(const std::vector<std::string>& output_layer_names, bool is_debug)
-		: output_layers(output_layer_names), is_debug(is_debug)
+	OpenModelInferBase::OpenModelInferBase(const std::vector<std::string>& output_layers, bool is_debug)
+		: output_layers(output_layers), is_debug(is_debug)
 	{
 	}
 
@@ -16,19 +16,19 @@ namespace space
 		timer.stop();
 
 		LOG("INFO") << "OpenModelInferBase 正在关闭/清理共享内存  ... " << std::endl;
-		for (auto& shared : shared_output_layers)
+		for (auto& shared : output_shared_layers)
 		{
 			UnmapViewOfFile(shared.second);
 			shared.second = NULL;
 		}
-		for (auto& handle : shared_output_handle)
+		for (auto& handle : output_shared_handle)
 		{
 			CloseHandle(handle);
 			handle = NULL;
 		}
 
-		shared_output_handle.clear();
-		shared_output_layers.clear();
+		output_shared_handle.clear();
+		output_shared_layers.clear();
 	}
 
 	void OpenModelInferBase::SetParameters(const Params& params)
@@ -38,7 +38,7 @@ namespace space
 
 		this->batch_size = params.batch_size;
 		this->infer_count = params.infer_count;
-		this->is_shared_blob = params.is_shared_blob;
+		this->is_mapping_blob = params.is_mapping_blob;
 		
 		for (auto& kv : params.ie_config)
 			this->ie_config[kv.first] = kv.second;
@@ -76,6 +76,8 @@ namespace space
 
 		//3.
 		LOG("INFO") << "正在创建可执行网络 ... " << std::endl;
+		if(ie_config.size() > 0)
+			LOG("INFO") << "\t" << ie_config.begin()->first << "=" << ie_config.begin()->second << std::endl;
 		execNetwork = ie.LoadNetwork(cnnNetwork, device, ie_config);
 		LOG("INFO") << "正在创建推断请求对象 ... " << std::endl;
 		for (int i = 0; i < infer_count; i++)
@@ -126,48 +128,32 @@ namespace space
 		LOG("INFO") << "\t配置网络输出  ... " << std::endl;
 		outputsInfo = cnnNetwork.getOutputsInfo();
 		outputsInfo.begin()->second->setPrecision(InferenceEngine::Precision::FP32);
-		//1.一层网络输出
-		if (outputsInfo.size() == 1)
-		{
-			output_layers.push_back(outputsInfo.begin()->first);
-			int size = GetPrecisionOfSize(outputsInfo.begin()->second->getTensorDesc().getPrecision());
-			InferenceEngine::SizeVector outputDims = outputsInfo.begin()->second->getTensorDesc().getDims();
 
-			//将输出层添加到共享
-			size_t shared_size = 1;
-			for (auto& v : outputDims) shared_size *= v;
-			shared_layers_info.clear();
-			shared_layers_info.push_back({ outputsInfo.begin()->first, shared_size * size });
-		}
-		
-		//2.print outputs info
+		if (output_layers.size() == 0)
+			for (const auto& output : outputsInfo)
+				output_layers.push_back(output.first);
+
+		//print outputs info
 		for (const auto& output : outputsInfo)
 		{
 			InferenceEngine::SizeVector outputDims = output.second->getTensorDesc().getDims();
 			std::vector<std::string>::iterator iter = find(output_layers.begin(), output_layers.end(), output.first);
-			LOG("INFO") << "\tOutput Name:[" << output.first << "]  Shape:" << outputDims << "  Precision:[" << output.second->getPrecision() << "]" << 
-				(iter != output_layers.end() ? (is_shared_blob ? "  \t[√]共享  [√]映射" : "  \t[√]共享  [×]映射") : "") << std::endl;
+			LOG("INFO") << "\tOutput Name:[" << output.first << "]  Shape:" << outputDims << "  Precision:[" << output.second->getPrecision() << "]" <<
+				(iter != output_layers.end() ? (is_mapping_blob ? "  \t[√]共享  [√]映射" : "  \t[√]共享  [×]映射") : "") << std::endl;
 		}
-		
-		//3.多层网络输出
-		if(outputsInfo.size() > 1)
+
+		//将输出层添加到共享
+		for (auto& output : outputsInfo)
 		{
-			if (output_layers.size() < 2)
-				THROW_IE_EXCEPTION << "当前网络模型为多层输出，但未选定网络输出名称 ... ";
+			int size = GetPrecisionOfSize(output.second->getTensorDesc().getPrecision());
+			InferenceEngine::SizeVector outputDims = output.second->getTensorDesc().getDims();
+			std::vector<std::string>::iterator it = find(output_layers.begin(), output_layers.end(), output.first);
 
-			//将输出层添加到共享
-			for (auto& output : outputsInfo)
+			if (it != output_layers.end())
 			{
-				int size = GetPrecisionOfSize(output.second->getTensorDesc().getPrecision());
-				InferenceEngine::SizeVector outputDims = output.second->getTensorDesc().getDims();
-				std::vector<std::string>::iterator it = find(output_layers.begin(), output_layers.end(), output.first);
-
-				if (it != output_layers.end())
-				{
-					size_t shared_size = 1;
-					for (auto& v : outputDims) shared_size *= v;
-					shared_layers_info.push_back({ output.first, shared_size * size });
-				}
+				size_t shared_size = 1;
+				for (auto& v : outputDims) shared_size *= v;
+				shared_layers_info.push_back({ output.first, shared_size * size });
 			}
 		}
 
@@ -242,19 +228,19 @@ namespace space
 			LPVOID pBuffer;
 			HANDLE pMapFile;
 
-			if (CreateOnlyWriteMapFile(pMapFile, pBuffer, shared.second, shared.first.c_str()))
+			if (CreateOnlyWriteMapFile(pMapFile, pBuffer, shared.second + SHARED_RESERVE_BYTE_SIZE, shared.first.c_str()))
 			{
-				shared_output_layers.push_back({ shared.first , pBuffer });
+				output_shared_layers.push_back({ shared.first , pBuffer });
 
 				//将输出层映射到内存共享
 				//重新设置指定输出层 Blob, 将指定输出层数据指向为共享指针，实现该层数据共享
-				if(is_shared_blob && infer_count == 1)
-					MemorySharedBlob(requestPtrs[0], shared_output_layers.back());
-				
-				// 多个推断对象，输出映射到同一个共享位置？？
-				//	if(is_shared_blob)
-				//		for(auto &requestPtr:requestPtrs)
-				//			MemorySharedBlob(requestPtr, shared_output_layers.back());
+				//if(is_mapping_blob && infer_count == 1)
+				//	MemorySharedBlob(requestPtrs[0], output_shared_layers.back(), SHARED_RESERVE_BYTE_SIZE);
+
+				//多个推断对象，输出映射到同一个共享位置？？
+				if (is_mapping_blob)
+					for (auto& requestPtr : requestPtrs)
+						MemorySharedBlob(requestPtr, output_shared_layers.back(), SHARED_RESERVE_BYTE_SIZE);
 			}
 			else
 			{

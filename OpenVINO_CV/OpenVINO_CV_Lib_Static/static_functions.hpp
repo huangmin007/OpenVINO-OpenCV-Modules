@@ -507,6 +507,42 @@ namespace space
 
         return new_rect;
     }
+    
+    /// <summary>
+    /// 绘制检测对象的边界
+    /// </summary>
+    /// <param name="frame"></param>
+    /// <param name="rect"></param>
+    static void DrawObjectBound(cv::Mat frame, const cv::Rect& src_rect)
+    {
+        auto rect = src_rect & cv::Rect(0, 0, frame.cols, frame.rows);
+
+        float scale = 0.2f;
+        int shift = 0;
+        int thickness = 2;
+        int lineType = cv::LINE_AA;
+        cv::Scalar border_color(0, 255, 0);
+
+        cv::rectangle(frame, rect, border_color, 1);
+        cv::Point h_width = cv::Point(rect.width * scale, 0);   //水平宽度
+        cv::Point v_height = cv::Point(0, rect.height * scale); //垂直高度
+
+        cv::Point left_top(rect.x, rect.y);
+        cv::line(frame, left_top, left_top + h_width, border_color, thickness, lineType, shift);     //-
+        cv::line(frame, left_top, left_top + v_height, border_color, thickness, lineType, shift);    //|
+
+        cv::Point left_bottom(rect.x, rect.y + rect.height - 1);
+        cv::line(frame, left_bottom, left_bottom + h_width, border_color, thickness, lineType, shift);       //-
+        cv::line(frame, left_bottom, left_bottom - v_height, border_color, thickness, lineType, shift);      //|
+
+        cv::Point right_top(rect.x + rect.width - 1, rect.y);
+        cv::line(frame, right_top, right_top - h_width, border_color, thickness, lineType, shift);   //-
+        cv::line(frame, right_top, right_top + v_height, border_color, thickness, lineType, shift);  //|
+
+        cv::Point right_bottom(rect.x + rect.width - 1, rect.y + rect.height - 1);
+        cv::line(frame, right_bottom, right_bottom - h_width, border_color, thickness, lineType, shift);   //-
+        cv::line(frame, right_bottom, right_bottom - v_height, border_color, thickness, lineType, shift);  //|
+    }
 
     /// <summary>
     /// 获取精度所对应的数据类型字节大小
@@ -548,7 +584,7 @@ namespace space
     /// </summary>
     /// <param name="requestPtr"></param>
     /// <param name="shared">{name, void*}</param>
-    inline void MemorySharedBlob(InferenceEngine::InferRequest::Ptr& requestPtr, const std::pair<std::string, LPVOID>& shared)
+    inline void MemorySharedBlob(InferenceEngine::InferRequest::Ptr& requestPtr, const std::pair<std::string, LPVOID>& shared, size_t offset = 0)
     {
         InferenceEngine::TensorDesc tensor = requestPtr->GetBlob(shared.first)->getTensorDesc();
         const InferenceEngine::Precision precision  = tensor.getPrecision();
@@ -556,32 +592,32 @@ namespace space
         switch (precision)
         {
         case InferenceEngine::Precision::U64:	//uint64_t
-            requestPtr->SetBlob(shared.first, InferenceEngine::make_shared_blob<uint64_t>(tensor, (uint64_t*)shared.second));
+            requestPtr->SetBlob(shared.first, InferenceEngine::make_shared_blob<uint64_t>(tensor, (uint64_t*)shared.second + offset));
             break;
         case InferenceEngine::Precision::I64:	//int64_t
-            requestPtr->SetBlob(shared.first, InferenceEngine::make_shared_blob<int64_t>(tensor, (int64_t*)shared.second));
+            requestPtr->SetBlob(shared.first, InferenceEngine::make_shared_blob<int64_t>(tensor, (int64_t*)shared.second + offset));
             break;
         case InferenceEngine::Precision::FP32:	//float
-            requestPtr->SetBlob(shared.first, InferenceEngine::make_shared_blob<float>(tensor, (float*)shared.second));
+            requestPtr->SetBlob(shared.first, InferenceEngine::make_shared_blob<float>(tensor, (float*)shared.second + offset));
             break;
         case InferenceEngine::Precision::I32:	//int32_t
-            requestPtr->SetBlob(shared.first, InferenceEngine::make_shared_blob<int32_t>(tensor, (int32_t*)shared.second));
+            requestPtr->SetBlob(shared.first, InferenceEngine::make_shared_blob<int32_t>(tensor, (int32_t*)shared.second + offset));
             break;
         case InferenceEngine::Precision::U16:	//uint16_t
-            requestPtr->SetBlob(shared.first, InferenceEngine::make_shared_blob<uint16_t>(tensor, (uint16_t*)shared.second));
+            requestPtr->SetBlob(shared.first, InferenceEngine::make_shared_blob<uint16_t>(tensor, (uint16_t*)shared.second + offset));
             break;
         case InferenceEngine::Precision::I16:	//int16_t
         case InferenceEngine::Precision::Q78:	//int16_t, uint16_t
         case InferenceEngine::Precision::FP16:	//int16_t, uint16_t	
-            requestPtr->SetBlob(shared.first, InferenceEngine::make_shared_blob<int16_t>(tensor, (int16_t*)shared.second));
+            requestPtr->SetBlob(shared.first, InferenceEngine::make_shared_blob<int16_t>(tensor, (int16_t*)shared.second + offset));
             break;
         case InferenceEngine::Precision::U8:	//uint8_t
         case InferenceEngine::Precision::BOOL:	//uint8_t
-            requestPtr->SetBlob(shared.first, InferenceEngine::make_shared_blob<uint8_t>(tensor, (uint8_t*)shared.second));
+            requestPtr->SetBlob(shared.first, InferenceEngine::make_shared_blob<uint8_t>(tensor, (uint8_t*)shared.second + offset));
             break;
         case InferenceEngine::Precision::I8:	//int8_t
         case InferenceEngine::Precision::BIN:	//int8_t, uint8_t
-            requestPtr->SetBlob(shared.first, InferenceEngine::make_shared_blob<int8_t>(tensor, (int8_t*)shared.second));
+            requestPtr->SetBlob(shared.first, InferenceEngine::make_shared_blob<int8_t>(tensor, (int8_t*)shared.second + offset));
             break;
         default:
             LOG("WARN") << "共享映射数据，未处理的输出精度：" << precision << std::endl;
