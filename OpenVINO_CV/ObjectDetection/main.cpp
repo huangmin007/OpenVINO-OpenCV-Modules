@@ -41,8 +41,8 @@ int main(int argc, char** argv)
     args.add<float>("conf", 'c', "检测结果的置信度阈值(confidence threshold)", false, 0.5);
     args.add<bool>("reshape", 'r', "重塑输入层，使输入源内存映射到网络输入层实现共享内存数据，不进行数据源缩放和拷贝", false, true);
 
-    args.add<std::string>("m0", 0, "用于 AI识别检测 的 联级网络模型名称/文件(.xml)和目标设备", false, 
-        "landmarks-regression-retail-0009:FP32:CPU,head-pose-estimation-adas-0001:FP32:CPU");
+    args.add<std::string>("m0", 0, "用于 AI识别检测 的 联级网络模型名称/文件(.xml)和目标设备；示例："
+        "landmarks-regression-retail-0009:FP32:CPU,head-pose-estimation-adas-0001:FP32:CPU", false, "");
 
     args.add<bool>("async", 0, "是否异步分析识别", false, true);
 #ifdef _DEBUG
@@ -114,35 +114,37 @@ int main(int argc, char** argv)
 
         //Parent
         ObjectDetection detector(output_layers, show);
-        detector.SetParameters({}, conf, labels);
-        detector.ConfigNetwork(ie, args.get<std::string>("model"), reshape);
+        detector.SetParameters({1,1,true}, conf, labels);
+        //detector.ConfigNetwork(ie, args.get<std::string>("model"), reshape);
+        detector.ConfigNetwork(ie, "models\\A_Test\\mobilenet_v1_0.25_128_frozen.xml", "CPU", reshape);
 
         //Sub
         //std::vector<std::string> model_infos = SplitString(args.get<std::string>("m0"), ',');
         std::vector<std::string> model_infos = {
             //"facial-landmarks-35-adas-0002:FP32:CPU",
-            "landmarks-regression-retail-0009:FP32:CPU",
+            //"landmarks-regression-retail-0009:FP32:CPU",
             //"head-pose-estimation-adas-0001:FP32:CPU",
+            //"face-reidentification-retail-0095:FP32:CPU"
         };
         for (int i = 0; i < model_infos.size(); i++)
         {
             ObjectRecognition* recognition = new ObjectRecognition({}, show);
             recognition->SetParameters({ 8, 1, true });
-            recognition->ConfigNetwork(ie, model_infos[i], false);
+            recognition->ConfigNetwork(ie, model_infos[i]);
             detector.AddSubNetwork(recognition);
         }
 
         inputSource.read(frame);
+        //cv::Mat img = cv::imread("models\\A_Test\\P0.png");
+        //cv::Mat rgb;
+        //cv::cvtColor(img, rgb, cv::COLOR_BGR2RGB);
         detector.RequestInfer(frame);
 
         std::vector<ObjectDetection::Result> results;
         std::stringstream title;
         title << "[Source] Object Detection [" << model["full"] << "]";
 
-        bool isResult = false;
-        std::stringstream txt;
         std::stringstream use_time;
-
         int delay = WaitKeyDelay;
         double infer_use_time = 0.0f;
         double frame_use_time = 0.0f;
@@ -179,7 +181,7 @@ int main(int argc, char** argv)
             delay = WaitKeyDelay - frame_use_time;
             if (delay <= 0) delay = 1;
 
-            cv::waitKey(2);
+            cv::waitKey(delay);
         }
     }
     catch (const std::exception& error)

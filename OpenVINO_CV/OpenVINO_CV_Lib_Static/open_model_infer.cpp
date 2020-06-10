@@ -9,6 +9,11 @@ namespace space
 	OpenModelInferBase::OpenModelInferBase(const std::vector<std::string>& output_layers, bool is_debug)
 		: output_layers(output_layers), is_debug(is_debug)
 	{
+		//强制异步请求
+		//ie_config[InferenceEngine::PluginConfigParams::KEY_EXCLUSIVE_ASYNC_REQUESTS] = InferenceEngine::PluginConfigParams::YES;
+
+		//指定CPU插件应用于推理的线程数。零（默认）表示使用所有（逻辑）内核
+		//ie_config[InferenceEngine::PluginConfigParams::KEY_CPU_THREADS_NUM] = "0";
 	}
 
 	OpenModelInferBase::~OpenModelInferBase()
@@ -39,6 +44,7 @@ namespace space
 		this->batch_size = params.batch_size;
 		this->infer_count = params.infer_count;
 		this->is_mapping_blob = params.is_mapping_blob;
+		this->request_callback = params.request_callback;
 		
 		for (auto& kv : params.ie_config)
 			this->ie_config[kv.first] = kv.second;
@@ -107,6 +113,11 @@ namespace space
 			inputsInfo.begin()->second->setLayout(InferenceEngine::Layout::NHWC);
 			inputsInfo.begin()->second->getPreProcess().setResizeAlgorithm(InferenceEngine::ResizeAlgorithm::RESIZE_BILINEAR);
 		}
+		else
+		{
+			inputsInfo.begin()->second->setLayout(InferenceEngine::Layout::NCHW);
+			inputsInfo.begin()->second->getPreProcess().setResizeAlgorithm(InferenceEngine::ResizeAlgorithm::RESIZE_BILINEAR);
+		}
 
 		//print inputs info
 		for (const auto& input : inputsInfo)
@@ -128,7 +139,6 @@ namespace space
 		LOG("INFO") << "\t配置网络输出  ... " << std::endl;
 		outputsInfo = cnnNetwork.getOutputsInfo();
 		outputsInfo.begin()->second->setPrecision(InferenceEngine::Precision::FP32);
-
 		if (output_layers.size() == 0)
 			for (const auto& output : outputsInfo)
 				output_layers.push_back(output.first);
@@ -183,10 +193,7 @@ namespace space
 
 					//1.解析数据，外部解析 OR 内部解析
 					if (request_callback != nullptr)
-					{
-						std::cout << "callback ... " << std::endl;
 						request_callback(request, code);
-					}
 					else
 						ParsingOutputData(request, code);
 
@@ -273,7 +280,9 @@ namespace space
 		}
 		if (requestPtr == nullptr) return;
 
-		LOG("INFO") << "找到一个 InferRequestPtr 对象，Input Address:" << (void*)requestPtr->GetBlob(inputsInfo.begin()->first)->buffer().as<uint8_t*>() << std::endl;
+		InferenceEngine::Blob::Ptr inputBlob = requestPtr->GetBlob(inputsInfo.begin()->first);
+		LOG("INFO") << "找到一个 InferRequestPtr 对象，Input Address:" << (void*)inputBlob->buffer().as<uint8_t*>() << std::endl;
+
 		if (is_reshape)
 		{
 			size_t width = frame.cols;
@@ -285,19 +294,18 @@ namespace space
 
 			bool is_dense = strideW == channels && strideH == channels * width;
 			if (!is_dense) throw std::logic_error("输入的图像帧不支持转换 ... ");
-			
+
 			//重新设置输入层 Blob，将输入图像内存数据指针共享给输入层，做实时或异步推断
 			//输入为图像原始尺寸，其实是会存在问题的，如果源图尺寸很大，那处理时间会更长
-			InferenceEngine::TensorDesc tensor = inputsInfo.begin()->second->getTensorDesc();
+			InferenceEngine::TensorDesc tensor = inputBlob->getTensorDesc();
 			InferenceEngine::TensorDesc n_tensor(tensor.getPrecision(), { 1, channels, height, width }, tensor.getLayout());
 			requestPtr->SetBlob(inputsInfo.begin()->first, InferenceEngine::make_shared_blob<uint8_t>(n_tensor, frame.data));
 		}
-		else		
+		else
 		{
-			InferenceEngine::Blob::Ptr inputBlob = requestPtr->GetBlob(inputsInfo.begin()->first);
 			MatU8ToBlob<uint8_t>(frame, inputBlob);
 		}
-		
+
 		//requestPtr->SetBatch(batch_size);
 		requestPtr->StartAsync();
 		t0 = std::chrono::high_resolution_clock::now();

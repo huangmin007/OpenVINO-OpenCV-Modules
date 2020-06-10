@@ -32,7 +32,7 @@ namespace space
 		{
 			code = request->Wait(InferenceEngine::IInferRequest::WaitMode::STATUS_ONLY);
 			if (code == InferenceEngine::StatusCode::INFER_NOT_STARTED
-				//|| code == InferenceEngine::StatusCode::OK
+				|| code == InferenceEngine::StatusCode::OK
 				)
 			{
 				requestPtr = request;
@@ -59,7 +59,7 @@ namespace space
 		requestPtr->SetBatch(count + 1);
 		requestPtr->StartAsync();
 		t0 = std::chrono::high_resolution_clock::now();
-	};
+	}
 
 	void ObjectRecognition::SetInferCallback()
 	{
@@ -84,6 +84,7 @@ namespace space
 					//2.更新显示结果
 					if (is_debug) UpdateDebugShow();
 
+#if NO_AUTO
 					//3.next infer request
 					prev_results = results;
 					frame_ptr.copyTo(prev_frame);
@@ -104,6 +105,7 @@ namespace space
 					request->SetBatch(count + 1, 0);
 					request->StartAsync(0);
 					t0 = std::chrono::high_resolution_clock::now();
+#endif
 				});
 		};
 
@@ -209,7 +211,9 @@ namespace space
 
 	void ObjectRecognition::ParsingOutputData(InferenceEngine::IInferRequest::Ptr request, InferenceEngine::StatusCode status)
 	{
-		std::vector<ObjectDetection::Result> results = this->prev_results;
+		std::vector<ObjectDetection::Result> results = this->results;
+		//std::vector<ObjectDetection::Result> results = this->prev_results;
+		//std::cout << "Count:" << results.size() << std::endl;
 
 		InferenceEngine::Blob::Ptr data;
 		request->GetBlob(outputsInfo.begin()->first.c_str(), data, 0);
@@ -217,6 +221,7 @@ namespace space
 
 		if (outputsInfo.size() == 1 && (dims.size() == 2 && dims[1] == 70) || (dims.size() == 4 && dims[1] == 10))
 		{
+			title = "Object Recognition [Face Landmarks]";
 			const float* buffer = data->buffer().as<float*>();
 			int length = dims[1];
 
@@ -252,9 +257,28 @@ namespace space
 			std::stringstream use_time;
 			use_time << "Recognition Count:" << results.size() << "  Infer Use Time:" << GetInferUseTime() << "ms  FPS:" << GetFPS();
 			cv::putText(prev_frame, use_time.str(), cv::Point(10, 25), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 0, 0), 2);
+		}
+		else if (outputsInfo.size() == 1 && dims.size() == 4 && dims[1] == 256)
+		{
+			title = "Object Reidentification [Face Reidentification]";
+			const float* buffer = data->buffer().as<float*>();
+			int length = dims[1];
 
-			cv::imshow("Object Recognition [Face Landmarks]", prev_frame);
-			cv::waitKey(1);
+			for (int i = 0; i < results.size(); i++)
+			{
+				std::vector<float> fv1;
+
+				for(int index = 0; index < length; index ++)
+					fv1.push_back(buffer[i]);
+
+				if (last_fv.size() > 0)
+				{
+					float dis = CosineDistance(fv1, last_fv);
+					std::cout << "Dis:" << dis << std::endl;
+				}
+
+				last_fv = fv1;
+			}
 		}
 		else if (outputsInfo.size() == 2)
 		{
@@ -262,6 +286,7 @@ namespace space
 		}
 		else if (outputsInfo.size() == 3 && dims.size() == 2 && dims[1] == 1)
 		{
+			title = "Object Recognition [Head Pose]";
 			InferenceEngine::Blob::Ptr angleR, angleP, angleY;
 			request->GetBlob(output_shared_layers[0].first.c_str(), angleR, 0);
 			request->GetBlob(output_shared_layers[1].first.c_str(), angleP, 0);
@@ -286,9 +311,6 @@ namespace space
 			std::stringstream use_time;
 			use_time << "Recognition Count:" << results.size() << "  Infer Use Time:" << GetInferUseTime() << "ms  FPS:" << GetFPS();
 			cv::putText(prev_frame, use_time.str(), cv::Point(10, 25), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 0, 0), 2);
-
-			cv::imshow("Object Recognition [Head Pose]", prev_frame);
-			cv::waitKey(1);
 		}
 		else
 		{
@@ -300,5 +322,7 @@ namespace space
 
 	void ObjectRecognition::UpdateDebugShow()
 	{
+		cv::imshow("title", prev_frame);
+		cv::waitKey(1);
 	}
 }

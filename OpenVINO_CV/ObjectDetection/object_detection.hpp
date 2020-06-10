@@ -86,7 +86,11 @@ namespace space
 	private:
 		cv::Mat prev_frame;
 		std::vector<ObjectDetection::Result> results;
-		std::vector<ObjectDetection::Result> prev_results;
+		//std::vector<ObjectDetection::Result> prev_results;
+
+		std::string title = "";
+
+		std::vector<float> last_fv;
 	};
 #pragma endregion
 };

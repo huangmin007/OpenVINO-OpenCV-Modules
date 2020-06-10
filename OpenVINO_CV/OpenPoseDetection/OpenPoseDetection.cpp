@@ -4,8 +4,10 @@
 #include <iostream>
 
 #include "pose_detection.hpp"
-#include "static_functions.hpp"
-#include "input_source.hpp"
+#include <static_functions.hpp>
+#include <input_source.hpp>
+
+using namespace space;
 
 int main()
 {
@@ -17,32 +19,32 @@ int main()
 
 #pragma region 参数设置解析
     //wait ...
+    bool show = true;
 #pragma endregion
 
     InputSource inputSource;
     if (!inputSource.open("camera:0:640x480"))
     {
         inputSource.release();
-        LOG_ERROR << "打开输入源失败 ... " << std::endl;
+        LOG("ERROR") << "打开输入源失败 ... " << std::endl;
         return EXIT_FAILURE;
     }
 
     InferenceEngine::Core ie;
-    PoseDetection detector("models\\hand_pose_iter_102000\\FP32\\pose_iter_160000.xml", "CPU", true);
-    detector.read(ie);
+    PoseDetection detector;
+    detector.ConfigNetwork(ie, "models\\A_hand_pose_iter_102000\\FP32\\pose_iter_160000.xml", "CPU", false);
 
-    cv::Mat prev_frame, frame;
+    cv::Mat frame;
     inputSource.read(frame);
+    detector.RequestInfer(frame);
 
-    std::vector<PoseDetection::Result> results;
-    detector.enqueue(frame);
-    detector.request();
-
-    prev_frame = frame.clone();
-    bool frameReadStatus = inputSource.read(frame);
+    std::stringstream use_time;
+    std::stringstream title;
+    title << "[Source] Object Detection";
 
     int delay = WaitKeyDelay;
-    double total_use_time = 0.0f;
+    double infer_use_time = 0.0f;
+    double frame_use_time = 0.0f;
     auto t0 = std::chrono::high_resolution_clock::now();
     auto t1 = std::chrono::high_resolution_clock::now();
 
@@ -51,46 +53,29 @@ int main()
         if (!IsRunning) break;
         t0 = std::chrono::high_resolution_clock::now();
 
-        bool isLastFrame = !frameReadStatus;
+        use_time.str("");
+        use_time << "Infer/Frame Use Time:" << infer_use_time << "/" << frame_use_time << "ms  fps:" << detector.GetFPS();
+        std::cout << "\33[2K\r[ INFO] " << use_time.str();
 
-        detector.wait();
-        if (detector.getResults(results, prev_frame))
+        if (show)
         {
-            cv::imshow("Pose Detection", prev_frame);
+            cv::imshow(title.str(), frame);
         }
-
-        //if (isLastFrame)
-        //{
-        //    detector.enqueue(frame);
-         //   detector.request();
-        //}
-
-        std::cout << "\33[2K\r[ INFO] Count:" << results.size() << " Total Use Time:" << total_use_time << "ms";
 
         if (!inputSource.read(frame))
         {
-            LOG_WARN << "读取帧失败 ... " << std::endl;
-            Sleep(10);
+            LOG("WARN") << "读取数据帧失败 ... " << std::endl;
+            Sleep(15);
             continue;
         }
 
-        for (int i = 0; i < results.size(); i++)
-        {
-            std::stringstream txt;
-            txt << "Label:" << results[i].label << " Conf:" << results[i].confidence;
-
-            //cv::rectangle(frame, results[i].location, cv::Scalar(0, 255, 0), 2);
-            //cv::putText(frame, txt.str(), cv::Point(results[i].location.x, results[i].location.y), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 255), 1);
-        }
-
-        detector.enqueue(frame);
-        detector.request();
-
-        prev_frame = frame.clone();
+        detector.RequestInfer(frame);
 
         t1 = std::chrono::high_resolution_clock::now();
-        total_use_time = std::chrono::duration_cast<ms>(t1 - t0).count();
-        delay = WaitKeyDelay - total_use_time;
+        infer_use_time = detector.GetInferUseTime();
+        frame_use_time = std::chrono::duration_cast<ms>(t1 - t0).count();
+
+        delay = WaitKeyDelay - frame_use_time;
         if (delay <= 0) delay = 1;
 
         cv::waitKey(delay);

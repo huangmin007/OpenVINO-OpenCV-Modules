@@ -51,7 +51,7 @@ namespace space
 	
 	void ObjectDetection::ParsingOutputData(InferenceEngine::IInferRequest::Ptr request, InferenceEngine::StatusCode status)
 	{
-		static InferenceEngine::SizeVector outputShape = outputsInfo.find(output_shared_layers.begin()->first)->second->getTensorDesc().getDims();
+		static InferenceEngine::SizeVector outputShape = outputsInfo.begin()->second->getTensorDesc().getDims();
 
 		//单层输出
 		if (output_shared_layers.size() == 1)
@@ -92,6 +92,27 @@ namespace space
 
 					results.push_back(rt);
 				}
+			}
+			else if (outputShape.size() == 4 && outputShape[1] == 1001)
+			{
+				int maxIdx = 0;
+				float maxP = 0.0;
+				int nclasses = 1001;
+				float sum = 1.0;
+
+				for (int i = 0; i < nclasses; i++)
+				{
+					float e = exp(buffer[i]);
+					sum = sum + e;
+					if (e > maxP)
+					{
+						maxP = e;
+						maxIdx = i;
+					}
+				}
+
+				float rtp = maxP / sum;
+				std::cout << "ID:" << maxIdx << " Cof" << rtp << std::endl;
 			}
 		}
 		//多层输出

@@ -261,7 +261,7 @@ namespace space
 		// 推断请求对象
 		std::vector<InferenceEngine::InferRequest::Ptr> requestPtrs;
 
-		FPCompletionCallback request_callback;
+		FPCompletionCallback request_callback = nullptr;
 
 		//引用输入的帧对象，主要是需要帧的宽，高，通道，类型、数据指针信息
 		cv::Mat frame_ptr;

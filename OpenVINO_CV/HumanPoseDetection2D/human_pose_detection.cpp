@@ -25,11 +25,8 @@ namespace space
         std::vector<std::vector<Peak> >& peaksFromHeatMap;
     };
 
-#if USE_MULTI_INFER
-    HumanPoseDetection::HumanPoseDetection(const std::vector<std::string>& output_layers_name, bool is_debug):OpenModelMultiInferBase(output_layers_name, is_debug)
-#else
-    HumanPoseDetection::HumanPoseDetection(const std::vector<std::string>& output_layers_name, bool is_debug) : OpenModelInferBase(output_layers_name, is_debug)
-#endif
+    HumanPoseDetection::HumanPoseDetection(const std::vector<std::string>& output_layers_name, bool is_debug)
+        : OpenModelInferBase(output_layers_name, is_debug)
     {
     };
     HumanPoseDetection::~HumanPoseDetection()
