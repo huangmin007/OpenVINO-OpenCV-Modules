@@ -5,7 +5,6 @@
 #include <fstream>
 #include "cmdline.h"
 #include "object_detection.hpp"
-#include "object_recognition.hpp"
 #include "static_functions.hpp"
 #include "input_source.hpp"
 
@@ -42,7 +41,8 @@ int main(int argc, char** argv)
     args.add<bool>("reshape", 'r', "重塑输入层，使输入源内存映射到网络输入层实现共享内存数据，不进行数据源缩放和拷贝", false, true);
 
     args.add<std::string>("m0", 0, "用于 AI识别检测 的 联级网络模型名称/文件(.xml)和目标设备；示例："
-        "landmarks-regression-retail-0009:FP32:CPU,head-pose-estimation-adas-0001:FP32:CPU", false, "");
+        "landmarks-regression-retail-0009:FP32:CPU,head-pose-estimation-adas-0001:FP32:CPU", false, "facial-landmarks-35-adas-0002:FP32:CPU");
+    //facial-landmarks-35-adas-0002
 
     args.add<bool>("async", 0, "是否异步分析识别", false, true);
 #ifdef _DEBUG
@@ -115,29 +115,27 @@ int main(int argc, char** argv)
         //Parent
         ObjectDetection detector(output_layers, show);
         detector.SetParameters({1,1,true}, conf, labels);
-        //detector.ConfigNetwork(ie, args.get<std::string>("model"), reshape);
-        detector.ConfigNetwork(ie, "models\\A_Test\\mobilenet_v1_0.25_128_frozen.xml", "CPU", reshape);
+        detector.ConfigNetwork(ie, args.get<std::string>("model"), reshape);
+        //detector.ConfigNetwork(ie, "models\\A_Test\\mobilenet_v1_0.25_128_frozen.xml", "CPU", reshape);
 
         //Sub
-        //std::vector<std::string> model_infos = SplitString(args.get<std::string>("m0"), ',');
-        std::vector<std::string> model_infos = {
+        std::vector<std::string> model_infos = SplitString(args.get<std::string>("m0"), ',');
+        //std::vector<std::string> model_infos = {
             //"facial-landmarks-35-adas-0002:FP32:CPU",
             //"landmarks-regression-retail-0009:FP32:CPU",
             //"head-pose-estimation-adas-0001:FP32:CPU",
             //"face-reidentification-retail-0095:FP32:CPU"
-        };
+        //};
         for (int i = 0; i < model_infos.size(); i++)
         {
             ObjectRecognition* recognition = new ObjectRecognition({}, show);
             recognition->SetParameters({ 8, 1, true });
-            recognition->ConfigNetwork(ie, model_infos[i]);
+            recognition->ConfigNetwork(ie, model_infos[i], false);
+
             detector.AddSubNetwork(recognition);
         }
 
         inputSource.read(frame);
-        //cv::Mat img = cv::imread("models\\A_Test\\P0.png");
-        //cv::Mat rgb;
-        //cv::cvtColor(img, rgb, cv::COLOR_BGR2RGB);
         detector.RequestInfer(frame);
 
         std::vector<ObjectDetection::Result> results;

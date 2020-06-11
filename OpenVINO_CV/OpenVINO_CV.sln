@@ -26,6 +26,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OpenPoseDetection", "OpenPo
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ObjectSegmentation", "ObjectSegmentation\ObjectSegmentation.vcxproj", "{7DC57BBC-51FF-4859-BE33-D8A248F8C6AF}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ObjectReidentification", "ObjectReidentification\ObjectReidentification.vcxproj", "{9601BE6C-5129-4F86-81AA-ABBB966CBD1A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -106,6 +108,14 @@ Global
 		{7DC57BBC-51FF-4859-BE33-D8A248F8C6AF}.Release|x64.Build.0 = Release|x64
 		{7DC57BBC-51FF-4859-BE33-D8A248F8C6AF}.Release|x86.ActiveCfg = Release|Win32
 		{7DC57BBC-51FF-4859-BE33-D8A248F8C6AF}.Release|x86.Build.0 = Release|Win32
+		{9601BE6C-5129-4F86-81AA-ABBB966CBD1A}.Debug|x64.ActiveCfg = Debug|x64
+		{9601BE6C-5129-4F86-81AA-ABBB966CBD1A}.Debug|x64.Build.0 = Debug|x64
+		{9601BE6C-5129-4F86-81AA-ABBB966CBD1A}.Debug|x86.ActiveCfg = Debug|Win32
+		{9601BE6C-5129-4F86-81AA-ABBB966CBD1A}.Debug|x86.Build.0 = Debug|Win32
+		{9601BE6C-5129-4F86-81AA-ABBB966CBD1A}.Release|x64.ActiveCfg = Release|x64
+		{9601BE6C-5129-4F86-81AA-ABBB966CBD1A}.Release|x64.Build.0 = Release|x64
+		{9601BE6C-5129-4F86-81AA-ABBB966CBD1A}.Release|x86.ActiveCfg = Release|Win32
+		{9601BE6C-5129-4F86-81AA-ABBB966CBD1A}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -19,8 +19,6 @@ namespace space
 		if (is_reshape)
 			throw std::invalid_argument("对象识别不支持重塑网络输入层 ... ");
 
-		if (results.size() == 0) return;
-
 		frame_ptr = frame;
 		this->results = results;
 

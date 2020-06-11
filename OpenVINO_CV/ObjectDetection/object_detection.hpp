@@ -7,7 +7,6 @@
 #include <inference_engine.hpp>
 
 #include "open_model_infer.hpp"
-#include "object_recognition.hpp"
 
 namespace space
 {

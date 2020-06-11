@@ -21,10 +21,9 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{90f7bb57-60a4-474e-ac66-769974400a3f}</ProjectGuid>
-    <RootNamespace>ObjectDetection</RootNamespace>
+    <ProjectGuid>{9601be6c-5129-4f86-81aa-abbb966cbd1a}</ProjectGuid>
+    <RootNamespace>ObjectReidentification</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>ObjectDetection</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -44,7 +43,7 @@
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v142</PlatformToolset>
-    <CharacterSet>MultiByte</CharacterSet>
+    <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -79,12 +78,10 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(INTEL_OPENVINO_DIR)\inference_engine\include;$(INTEL_OPENVINO_DIR)\opencv\include;..\OpenVINO_CV_Lib_Static;..\Libraries\common\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(INTEL_OPENVINO_DIR)\inference_engine\lib\intel64\Debug;$(INTEL_OPENVINO_DIR)\opencv\lib;..\Libraries\common\lib\Debug;..\Libraries\openvino_cv\lib\Debug;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(INTEL_OPENVINO_DIR)\inference_engine\include;$(INTEL_OPENVINO_DIR)\opencv\include;..\OpenVINO_CV_Lib_Static;..\Libraries\common\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(INTEL_OPENVINO_DIR)\deployment_tools\ngraph\include~;$(INTEL_OPENVINO_DIR)\inference_engine\include;$(INTEL_OPENVINO_DIR)\opencv\include;..\OpenVINO_CV_Lib_Static;..\Libraries\common\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(INTEL_OPENVINO_DIR)\inference_engine\lib\intel64\Release;$(INTEL_OPENVINO_DIR)\opencv\lib;..\Libraries\common\lib\Release;..\Libraries\openvino_cv\lib\Release;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -119,13 +116,12 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>OpenVINO_CV_Lib_Static.lib;opencv_core430d.lib;opencv_videoio430d.lib;opencv_highgui430d.lib;opencv_imgproc430d.lib;opencv_imgcodecs430d.lib;inference_engine_legacyd.lib;inference_engined.lib;inference_engine_c_apid.lib;inference_engine_nn_builderd.lib;monitors.lib;pdh.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -146,12 +142,27 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="action_detector.cpp" />
+    <ClCompile Include="align_transform.cpp" />
+    <ClCompile Include="cnn.cpp" />
+    <ClCompile Include="detector.cpp" />
+    <ClCompile Include="image_grabber.cpp" />
+    <ClCompile Include="logger.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="object_detection.cpp" />
-    <ClCompile Include="object_recognition.cpp" />
+    <ClCompile Include="reid_gallery.cpp" />
+    <ClCompile Include="tracker.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="object_detection.hpp" />
+    <ClInclude Include="actions.hpp" />
+    <ClInclude Include="action_detector.hpp" />
+    <ClInclude Include="cnn.hpp" />
+    <ClInclude Include="detector.hpp" />
+    <ClInclude Include="face_reid.hpp" />
+    <ClInclude Include="image_grabber.hpp" />
+    <ClInclude Include="logger.hpp" />
+    <ClInclude Include="smart_classroom_demo.hpp" />
+    <ClInclude Include="tracker.hpp" />
+    <ClInclude Include="utils.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
