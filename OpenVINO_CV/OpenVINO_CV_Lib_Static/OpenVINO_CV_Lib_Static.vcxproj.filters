@@ -42,9 +42,6 @@
     <ClInclude Include="open_model_infer.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="open_model_multi_infer.hpp">
-      <Filter>头文件</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -57,9 +54,6 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="open_model_infer.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="open_model_multi_infer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

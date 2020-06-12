@@ -41,7 +41,7 @@ int main(int argc, char** argv)
     args.add<bool>("reshape", 'r', "重塑输入层，使输入源内存映射到网络输入层实现共享内存数据，不进行数据源缩放和拷贝", false, true);
 
     args.add<std::string>("m0", 0, "用于 AI识别检测 的 联级网络模型名称/文件(.xml)和目标设备；示例："
-        "landmarks-regression-retail-0009:FP32:CPU,head-pose-estimation-adas-0001:FP32:CPU", false, "facial-landmarks-35-adas-0002:FP32:CPU");
+        "landmarks-regression-retail-0009:FP32:CPU,head-pose-estimation-adas-0001:FP32:CPU", false, "");// "facial-landmarks-35-adas-0002:FP32:CPU");
     //facial-landmarks-35-adas-0002
 
     args.add<bool>("async", 0, "是否异步分析识别", false, true);

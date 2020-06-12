@@ -48,9 +48,9 @@ namespace space
 		for (int i = 0; i < count; i++)
 		{
 			if (results[i].location.empty()) continue;
-			auto clipRect = results[i].location & cv::Rect(0, 0, frame.cols, frame.rows);
+			auto clipRect = results[i].location & cv::Rect(0, 0, prev_frame.cols, prev_frame.rows);
 
-			cv::Mat roi = frame(clipRect);
+			cv::Mat roi = prev_frame(clipRect);
 			MatU8ToBlob<uint8_t>(roi, inputBlob, i);
 		}
 

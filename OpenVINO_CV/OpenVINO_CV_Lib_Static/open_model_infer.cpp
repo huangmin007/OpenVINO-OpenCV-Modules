@@ -237,6 +237,7 @@ namespace space
 
 			if (CreateOnlyWriteMapFile(pMapFile, pBuffer, shared.second + SHARED_RESERVE_BYTE_SIZE, shared.first.c_str()))
 			{
+				output_shared_handle.push_back(pMapFile);
 				output_shared_layers.push_back({ shared.first , pBuffer });
 
 				//将输出层映射到内存共享
@@ -248,6 +249,8 @@ namespace space
 				if (is_mapping_blob)
 					for (auto& requestPtr : requestPtrs)
 						MemorySharedBlob(requestPtr, output_shared_layers.back(), SHARED_RESERVE_BYTE_SIZE);
+
+				//LOG("INGO") << "共享内存 " << shared.first << " 映射：" << std::boolalpha << is_mapping_blob << std::endl;
 			}
 			else
 			{

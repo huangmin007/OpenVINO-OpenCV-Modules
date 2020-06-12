@@ -56,9 +56,12 @@ namespace space
 		//µ¥²ãÊä³ö
 		if (output_shared_layers.size() == 1)
 		{
-			InferenceEngine::Blob::Ptr data;
-			request->GetBlob(output_shared_layers.begin()->first.c_str(), data, 0);
-			const float* buffer = data->buffer().as<float*>();
+			//InferenceEngine::Blob::Ptr data;
+			//request->GetBlob(output_shared_layers.begin()->first.c_str(), data, 0);
+			//const float* buffer = data->buffer().as<float*>();
+
+			const float* buffer = (float*)output_shared_layers.begin()->second + SHARED_RESERVE_BYTE_SIZE;
+
 
 			//[1x1xNx7] FP32
 			if (outputShape.size() == 4 && outputShape[0] == 1 && outputShape[1] == 1 && outputShape[3] == 7)

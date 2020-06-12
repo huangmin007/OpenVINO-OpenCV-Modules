@@ -206,18 +206,14 @@ namespace space
         DWORD ErrorID = GetLastErrorFormatMessage(message);     //GetLastError 检查 CreateFileMapping 状态
         LOG("INFO") << "CreateFileMapping [" << name << "]  GetLastError:" << ErrorID << "  Message:" << (char*)message;
 
-        if (ErrorID != 0 || handle == NULL) return false;
+        if (ErrorID != 0) return false;
 
         ///映射到当前进程的地址空间视图
         buffer = MapViewOfFile(handle, FILE_WRITE_ACCESS, 0, 0, size);  //FILE_WRITE_ACCESS,FILE_MAP_ALL_ACCESS,,FILE_MAP_WRITE
         ErrorID = GetLastErrorFormatMessage(message);                   //GetLastError 检查 MapViewOfFile 状态
         LOG("INFO") << "MapViewOfFile     [" << name << "]  GetLastError:" << ErrorID << "  Message:" << (char*)message;
 
-        if (ErrorID != 0 || buffer == NULL)
-        {
-            CloseHandle(handle);
-            return false;
-        }
+        if (ErrorID != 0) return false;
 
         return true;
     }
@@ -239,7 +235,7 @@ namespace space
         DWORD ErrorID = GetLastErrorFormatMessage(message);
         LOG("INFO") << "OpenFileMapping [" << name << "]  GetLastError:" << ErrorID << "  Message: " << (char*)message;
 
-        if (ErrorID != 0 || handle == NULL) return false;
+        if (ErrorID != 0) return false;
 
         ///映射到当前进程的地址空间视图
         buffer = MapViewOfFile(handle, FILE_MAP_READ, 0, 0, 0);
@@ -247,11 +243,7 @@ namespace space
         ErrorID = GetLastErrorFormatMessage(message);
         LOG("INFO") << "MapViewOfFile   [" << name << "]  GetLastError:" << ErrorID << "  Message:" << (char*)message;
 
-        if (ErrorID != 0 || buffer == NULL)
-        {
-            CloseHandle(handle);
-            return false;
-        }
+        if (ErrorID != 0) return false;
 
         return true;
     }

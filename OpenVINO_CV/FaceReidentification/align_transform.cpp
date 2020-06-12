@@ -11,7 +11,8 @@
 
 static const float h = 112.;
 static const float w = 96.;
-// reference landmarks points in the unit square [0,1]x[0,1]
+
+// 单位正方形中的参考地标点 [0,1]x[0,1]
 static const float ref_landmarks_normalized[] = {
     30.2946f / w, 51.6963f / h, 65.5318f / w, 51.5014f / h, 48.0252f / w,
     71.7366f / h, 33.5493f / w, 92.3655f / h, 62.7299f / w, 92.2041f / h};

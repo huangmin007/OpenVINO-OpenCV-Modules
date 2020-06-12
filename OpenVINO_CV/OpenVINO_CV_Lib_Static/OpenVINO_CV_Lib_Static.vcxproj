@@ -159,7 +159,6 @@
     <ClInclude Include="input_source.hpp" />
     <ClInclude Include="io_data_format.hpp" />
     <ClInclude Include="open_model_infer.hpp" />
-    <ClInclude Include="open_model_multi_infer.hpp" />
     <ClInclude Include="output_source.hpp" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="static_functions.hpp" />
@@ -168,7 +167,6 @@
   <ItemGroup>
     <ClCompile Include="input_source.cpp" />
     <ClCompile Include="open_model_infer.cpp" />
-    <ClCompile Include="open_model_multi_infer.cpp" />
     <ClCompile Include="output_source.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
