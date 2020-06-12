@@ -14,7 +14,8 @@
 #include <opencv2/opencv.hpp>
 
 namespace {
-    float ComputeReidDistance(const cv::Mat& descr1, const cv::Mat& descr2) {
+    float ComputeReidDistance(const cv::Mat& descr1, const cv::Mat& descr2) 
+    {
         float xy = static_cast<float>(descr1.dot(descr2));
         float xx = static_cast<float>(descr1.dot(descr1));
         float yy = static_cast<float>(descr2.dot(descr2));
@@ -135,10 +136,13 @@ std::vector<int> EmbeddingsGallery::GetIDsByEmbeddings(const std::vector<cv::Mat
 
     cv::Mat distances(static_cast<int>(embeddings.size()), static_cast<int>(idx_to_id.size()), CV_32F);
 
-    for (int i = 0; i < distances.rows; i++) {
+    for (int i = 0; i < distances.rows; i++) 
+    {
         int k = 0;
-        for (size_t j = 0; j < identities.size(); j++) {
-            for (const auto& reference_emb : identities[j].embeddings) {
+        for (size_t j = 0; j < identities.size(); j++)
+        {
+            for (const auto& reference_emb : identities[j].embeddings) 
+            {
                 distances.at<float>(i, k) = ComputeReidDistance(embeddings[i], reference_emb);
                 k++;
             }

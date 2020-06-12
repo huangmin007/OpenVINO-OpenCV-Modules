@@ -11,6 +11,8 @@ ImageGrabber::ImageGrabber(const std::string& fname) {
     is_sequence = false;
     if (fname == "cam") {
         is_opened = cap.open(0);
+        cap.set(cv::CAP_PROP_FRAME_WIDTH, 1920);
+        cap.set(cv::CAP_PROP_FRAME_HEIGHT, 1080);
     } else {
         is_opened = cap.open(fname);
     }

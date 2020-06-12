@@ -12,6 +12,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 
 #include <inference_engine.hpp>
+#include <static_functions.hpp>
 
 using namespace InferenceEngine;
 
@@ -50,10 +51,13 @@ void CnnDLSDKBase::InferBatch(
     const size_t batch_size = input->getTensorDesc().getDims()[0];
 
     size_t num_imgs = frames.size();
-    for (size_t batch_i = 0; batch_i < num_imgs; batch_i += batch_size) {
+    for (size_t batch_i = 0; batch_i < num_imgs; batch_i += batch_size)
+    {
         const size_t current_batch_size = std::min(batch_size, num_imgs - batch_i);
-        for (size_t b = 0; b < current_batch_size; b++) {
-            matU8ToBlob<uint8_t>(frames[batch_i + b], input, b);
+
+        for (size_t b = 0; b < current_batch_size; b++) 
+        {
+            space::MatU8ToBlob<uint8_t>(frames[batch_i + b], input, b);
         }
 
         if (config_.max_batch_size != 1)
@@ -61,7 +65,8 @@ void CnnDLSDKBase::InferBatch(
         infer_request_.Infer();
 
         InferenceEngine::BlobMap blobs;
-        for (const auto& name : output_blobs_names_)  {
+        for (const auto& name : output_blobs_names_)  
+        {
             blobs[name] = infer_request_.GetBlob(name);
         }
         fetch_results(blobs, current_batch_size);
@@ -99,7 +104,8 @@ void VectorCNN::Compute(const std::vector<cv::Mat>& images, std::vector<cv::Mat>
         return;
     }
     vectors->clear();
-    auto results_fetcher = [vectors, outp_shape](const InferenceEngine::BlobMap& outputs, size_t batch_size) {
+    auto results_fetcher = [vectors, outp_shape](const InferenceEngine::BlobMap& outputs, size_t batch_size) 
+    {
         for (auto&& item : outputs) {
             InferenceEngine::Blob::Ptr blob = item.second;
             if (blob == nullptr) {

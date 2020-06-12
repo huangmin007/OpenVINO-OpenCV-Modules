@@ -56,9 +56,6 @@
     <ClInclude Include="logger.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="smart_classroom_demo.hpp">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="tracker.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
