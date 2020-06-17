@@ -26,19 +26,19 @@ int main(int argc, char** argv)
     args.add("info", 0, "Inference Engine Infomation");
 
     args.add<std::string>("input", 'i', "输入源参数，格式：(video|camera|shared)[:value[:value[:...]]]", false, "shared:od_source.bin");
+    args.add<std::string>("input_shared", 0, "输入共享内存名称", false, "527");
+
     args.add<std::string>("model", 'm', "用于 AI识别检测 的 网络模型名称/文件(.xml)和目标设备，格式：(AI模型名称)[:精度[:硬件]]，", false,
         "facial-landmarks-35-adas-0002:FP32:CPU"); //facial-landmarks-35-adas-0002 , landmarks-regression-retail-0009
     args.add<std::string>("output_layers", 'o', "(output layer names)多层网络输出参数，单层使用默认输出，网络层名称，以':'分割，区分大小写，格式：layerName:layerName:...", false, "");
     
-    args.add<std::string>("input_shared", 0, "输入共享内存名称", false, "detection_out");
-    args.add<float>("conf", 'c', "检测结果的置信度阈值(confidence threshold)", false, 0.5);
 
 #ifdef _DEBUG
     args.add<bool>("show", 0, "是否显示视频窗口，用于调试", false, true);
 #else
     args.add<bool>("show", 0, "是否显示视频窗口，用于调试", false, false);
 #endif
-    args.set_program_name("Object Detection");
+    args.set_program_name("Object Recognition");
 
     LOG("INFO") << "参数解析 ... " << std::endl;
     //----------------- 第二步：解析输入参数 ----------------
@@ -60,7 +60,6 @@ int main(int argc, char** argv)
     }
 
     bool show = args.get<bool>("show");
-    float conf = args.get<float>("conf");
     std::map<std::string, std::string> model = ParseArgsForModel(args.get<std::string>("model"));
     std::vector<std::string> input_shared = SplitString(args.get<std::string>("input_shared"), ':');
     std::vector<std::string> output_layers = SplitString(args.get<std::string>("output_layers"), ':');
@@ -75,13 +74,10 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
-    
-
     try
     {
         InferenceEngine::Core ie;
         ie.SetConfig({ {InferenceEngine::PluginConfigParams::KEY_DYN_BATCH_ENABLED, InferenceEngine::PluginConfigParams::YES} }, "CPU");
-
 
         ObjectRecognition detector(input_shared, output_layers, show);
         detector.SetParameters({4, 1, true});
@@ -106,15 +102,13 @@ int main(int argc, char** argv)
             use_time << "Infer/Frame Use Time:" << infer_use_time << "/" << frame_use_time << "ms  fps:" << detector.GetFPS();
             std::cout << "\33[2K\r[ INFO] " << use_time.str();
 
-            if (show)
-            {
-                cv::imshow("Source", frame);
-            }
+#if _DEBUG
+                cv::imshow("[Source] Object Recognition", frame);
+#endif
 
             if (!inputSource.read(frame))
             {
-                LOG("WARN") << "读取数据帧失败 ... " << std::endl;
-                Sleep(15);
+                Sleep(10);
                 continue;
             }
 

@@ -123,6 +123,8 @@ namespace space
 			std::map<std::string, std::string> ie_config;
 			//设置推断完成外部回调
 			FPCompletionCallback request_callback = nullptr;	
+			//异步回调完成后，自动请求下一次推断
+			bool auto_request_infer = true;
 
 			friend std::ostream& operator << (std::ostream& stream, const OpenModelInferBase::Params& params)
 			{

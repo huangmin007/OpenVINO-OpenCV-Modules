@@ -45,6 +45,7 @@ namespace space
 	const std::vector<std::string> SplitString(const std::string& src, const char delimiter);
 
 	float CosineDistance(const std::vector<float>& fv1, const std::vector<float>& fv2);
+    void MemorySharedBlob(InferenceEngine::InferRequest::Ptr& requestPtr, const std::pair<std::string, LPVOID>& shared, size_t offset = 0);
 
 	template <typename T>
 	void MatU8ToBlob(const cv::Mat& orig_image, InferenceEngine::Blob::Ptr& blob, int batchIndex = 0);
@@ -248,7 +249,119 @@ namespace space
         return true;
     }
 
+    using OutputSharedLayer = std::tuple<std::string, HANDLE, LPVOID>;
+    using OutputSharedLayers = std::vector<OutputSharedLayer>;
 
+    inline const OutputSharedLayer CreateSharedBlob(
+        InferenceEngine::InferRequest::Ptr& request, const std::string name, 
+        size_t reserve_byte_size = 32)
+    {
+        if(request == nullptr || name.empty())  throw std::invalid_argument("参数不能为空");
+
+        InferenceEngine::Blob::Ptr blob = request->GetBlob(name);
+        if (blob == nullptr) throw std::invalid_argument("未获取到 Blob 数据");
+
+        size_t buffer_size = blob->byteSize() + reserve_byte_size;
+        InferenceEngine::TensorDesc tensor = blob->getTensorDesc();
+        const InferenceEngine::Precision precision = tensor.getPrecision();
+
+        LPVOID buffer; HANDLE handle;
+        if (CreateOnlyWriteMapFile(handle, buffer, buffer_size, name.c_str()))
+        {
+            switch (precision)
+            {
+            case InferenceEngine::Precision::U64:	//uint64_t
+                request->SetBlob(name, InferenceEngine::make_shared_blob<uint64_t>(tensor, (uint64_t*)buffer + reserve_byte_size));
+                break;
+            case InferenceEngine::Precision::I64:	//int64_t
+                request->SetBlob(name, InferenceEngine::make_shared_blob<int64_t>(tensor, (int64_t*)buffer + reserve_byte_size));
+                break;
+            case InferenceEngine::Precision::FP32:	//float
+                request->SetBlob(name, InferenceEngine::make_shared_blob<float>(tensor, (float*)buffer + reserve_byte_size));
+                break;
+            case InferenceEngine::Precision::I32:	//int32_t
+                request->SetBlob(name, InferenceEngine::make_shared_blob<int32_t>(tensor, (int32_t*)buffer + reserve_byte_size));
+                break;
+            case InferenceEngine::Precision::U16:	//uint16_t
+                request->SetBlob(name, InferenceEngine::make_shared_blob<uint16_t>(tensor, (uint16_t*)buffer + reserve_byte_size));
+                break;
+            case InferenceEngine::Precision::I16:	//int16_t
+            case InferenceEngine::Precision::Q78:	//int16_t, uint16_t
+            case InferenceEngine::Precision::FP16:	//int16_t, uint16_t	
+                request->SetBlob(name, InferenceEngine::make_shared_blob<int16_t>(tensor, (int16_t*)buffer + reserve_byte_size));
+                break;
+            case InferenceEngine::Precision::U8:	//uint8_t
+            case InferenceEngine::Precision::BOOL:	//uint8_t
+                request->SetBlob(name, InferenceEngine::make_shared_blob<uint8_t>(tensor, (uint8_t*)buffer + reserve_byte_size));
+                break;
+            case InferenceEngine::Precision::I8:	//int8_t
+            case InferenceEngine::Precision::BIN:	//int8_t, uint8_t
+                request->SetBlob(name, InferenceEngine::make_shared_blob<int8_t>(tensor, (int8_t*)buffer + reserve_byte_size));
+                break;
+            default:
+                LOG("WARN") << "共享映射数据，未处理的输出精度：" << precision << std::endl;
+                throw std::invalid_argument("共享映射数据，未处理的输出精度：" + precision);
+            }
+        }
+        else
+        {
+            LOG("ERROR") << "共享内存块 " << name << "创建失败 ... " << std::endl;
+            throw std::logic_error("共享内存块创建失败 ... ");
+        }
+        
+        return { name, handle, buffer};
+    }
+
+    inline const OutputSharedLayers CreateSharedMapping(
+        const std::vector<InferenceEngine::InferRequest::Ptr>& requestPtrs, 
+        const std::vector<std::pair<std::string, std::size_t>>& shared_layers_info, 
+        bool is_mapping_blob = true, size_t reserve_byte_size = 32)
+    {
+        OutputSharedLayers shared_layers;
+
+        for (const auto& shared : shared_layers_info)
+        {
+            LPVOID buffer;
+            HANDLE handle;
+
+
+            if (CreateOnlyWriteMapFile(handle, buffer, shared.second + reserve_byte_size, shared.first.c_str()))
+            {
+                shared_layers.push_back({shared.first, handle, buffer });
+
+                //将输出层映射到内存共享
+                //重新设置指定输出层 Blob, 将指定输出层数据指向为共享指针，实现该层数据共享
+                //多个推断对象，输出映射到同一个共享位置？？
+                if (is_mapping_blob)
+                    for (auto requestPtr : requestPtrs)
+                        MemorySharedBlob(requestPtr, { shared.first , buffer }, reserve_byte_size);
+
+                LOG("INGO") << "共享内存 " << shared.first << " 映射：" << std::boolalpha << is_mapping_blob << std::endl;
+            }
+            else
+            {
+                LOG("ERROR") << "共享内存块创建失败 ... " << std::endl;
+                throw std::logic_error("共享内存块创建失败 ... ");
+            }
+        }
+
+        return shared_layers;
+    }
+
+
+    inline void DisposeSharedMapping(OutputSharedLayers &shared_layers)
+    {
+        for (auto& shared : shared_layers)
+        {
+            UnmapViewOfFile(std::get<2>(shared));   //buffer
+            CloseHandle(std::get<1>(shared));       //handle
+
+            std::get<1>(shared) = NULL;
+            std::get<2>(shared) = NULL;
+        }
+
+        shared_layers.clear();
+    }
 
     /// <summary>
     /// 解析 Size 参数，格式：width(x|,)height
@@ -576,7 +689,7 @@ namespace space
     /// </summary>
     /// <param name="requestPtr"></param>
     /// <param name="shared">{name, void*}</param>
-    inline void MemorySharedBlob(InferenceEngine::InferRequest::Ptr& requestPtr, const std::pair<std::string, LPVOID>& shared, size_t offset = 0)
+    inline void MemorySharedBlob(InferenceEngine::InferRequest::Ptr& requestPtr, const std::pair<std::string, LPVOID>& shared, size_t offset)
     {
         InferenceEngine::TensorDesc tensor = requestPtr->GetBlob(shared.first)->getTensorDesc();
         const InferenceEngine::Precision precision  = tensor.getPrecision();
@@ -661,9 +774,9 @@ namespace space
         {
             std::cout << value.as<std::vector<unsigned int> >() << std::endl;
         }
-        else if (value.is<std::tuple<unsigned int, unsigned int, unsigned int> >())
+        else if (value.is<std::tuple<unsigned int, unsigned int, unsigned int>>())
         {
-            auto values = value.as<std::tuple<unsigned int, unsigned int, unsigned int> >();
+            auto values = value.as<std::tuple<unsigned int, unsigned int, unsigned int>>();
             std::cout << "{ ";
             std::cout << std::get<0>(values) << ", ";
             std::cout << std::get<1>(values) << ", ";
