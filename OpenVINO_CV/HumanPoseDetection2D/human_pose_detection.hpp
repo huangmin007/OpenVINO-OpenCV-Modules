@@ -45,6 +45,7 @@ namespace space
     {
     public:
         HumanPoseDetection(bool is_debug = true);
+        HumanPoseDetection(bool is_debug = true, InferenceEngine::ColorFormat color_format = InferenceEngine::ColorFormat::BGR);
         ~HumanPoseDetection();
 
 
@@ -72,7 +73,7 @@ namespace space
         /// <param name="frame">图像帧对象</param>
         void RequestInfer(const cv::Mat& frame);
 
-        void RequestInfer(const std::string& name);
+        //void RequestInfer(const std::string& name);
 
 
         /// <summary>
@@ -127,6 +128,8 @@ namespace space
 
         bool is_debug = true;			//是否输出部份调试信息
         std::stringstream debug_title;	//调试输出窗口标题
+
+        InferenceEngine::ColorFormat color_format = InferenceEngine::ColorFormat::BGR;
 
         //CNN 网络对象
         InferenceEngine::CNNNetwork cnnNetwork;

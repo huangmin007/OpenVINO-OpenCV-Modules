@@ -27,13 +27,16 @@ static bool IsRunning = true;
 
 namespace space
 {
-    //共享保留字节数
+    //共享内存保留字节数
     #define SHARED_RESERVE_BYTE_SIZE 32
+
     //日志格式
     #define LOG(type)       (std::cout << "[" << std::setw(5) << std::right << type << "] ")
 
     //ms
     using ms = std::chrono::duration<double, std::ratio<1, 1000>>;
+    using hc = std::chrono::high_resolution_clock;
+
     //输出层共享对象
     using OutputSharedLayer = std::tuple<std::string, HANDLE, LPVOID>;
     //输出层共享对象
@@ -191,11 +194,39 @@ namespace space
 #endif
 
     template <typename T>
-    std::ostream& operator << (std::ostream& stream, const std::vector<T>& v)
+    inline std::ostream& operator << (std::ostream& stream, const std::vector<T>& v)
     {
         stream << "[";
         for (int i = 0; i < v.size(); i++)
             stream << v[i] << (i != v.size() - 1 ? "," : "]");
+
+        return stream;
+    }    
+    inline std::ostream& operator << (std::ostream& stream, const InferenceEngine::InputsDataMap& inputsInfo)
+    {
+        for (const auto& input : inputsInfo)
+        {
+            stream << "Input Name:[" << input.first << "] " <<
+                "Shape:" << input.second->getTensorDesc().getDims() << " " <<
+                "Layout:[" << input.second->getTensorDesc().getLayout() << "] " <<
+                "Precision:[" << input.second->getPrecision() << "] " <<
+                "ColorFormat:[" << input.second->getPreProcess().getColorFormat() << "] " <<
+                "ResizeAlgorithm:[" << input.second->getPreProcess().getResizeAlgorithm() << "] " <<
+                "\r\n";
+        }
+
+        return stream;
+    }    
+    inline std::ostream& operator << (std::ostream& stream, const InferenceEngine::OutputsDataMap& outputsInfo)
+    {
+        for (const auto& output : outputsInfo)
+        {
+            stream << "Output Name:[" << output.first << "] " <<
+                "Shape:" << output.second->getTensorDesc().getDims() << " " <<
+                "Layout:[" << output.second->getTensorDesc().getLayout() << "] " <<
+                "Precision:[" << output.second->getPrecision() << "] " <<
+                "\r\n";
+        }
 
         return stream;
     }
@@ -211,8 +242,10 @@ namespace space
         {
         case CTRL_C_EVENT:          //当用户按下了CTRL+C,或者由GenerateConsoleCtrlEvent API发出
         case CTRL_BREAK_EVENT:      //用户按下CTRL+BREAK, 或者由 GenerateConsoleCtrlEvent API 发出
-            if (!IsRunning) exit(0);
-            else IsRunning = false;
+            if (!IsRunning)
+                exit(0);
+            else 
+                IsRunning = false;
             break;
 
         case CTRL_CLOSE_EVENT:      //当试图关闭控制台程序，系统发送关闭消息
@@ -298,7 +331,7 @@ namespace space
     }
 
     /// <summary>
-    /// 创建共享 Blob 层
+    /// 创建共享 Blob 层，将指定的 Blob 设置为共享层（存在问题吗？？）
     /// </summary>
     /// <param name="request">推断请求对象</param>
     /// <param name="name">name of blob </param>
@@ -374,6 +407,7 @@ namespace space
 
         return shared_layers;
     }
+
     /// <summary>
     /// 清理由 CreateSharedBlobs 创建的内存共享对象
     /// </summary>
@@ -599,7 +633,7 @@ namespace space
     /// <param name="request"></param>
     /// <param name="input_name"></param>
     /// <param name="frame"></param>
-    static inline void MrapMat2Blob(InferenceEngine::InferRequest::Ptr request, const std::string& input_name, const cv::Mat& frame)
+    static inline void WrapMat2Blob(InferenceEngine::InferRequest::Ptr request, const std::string& input_name, const cv::Mat& frame)
     {
         size_t width = frame.cols;
         size_t height = frame.rows;
@@ -756,7 +790,7 @@ namespace space
     /// <summary>
     /// 输出 InferenceEngine 引擎版本，及可计算设备列表
     /// </summary>
-    static inline void InferenceEngineInformation(std::string modelInfo)
+    static inline void InferenceEngineInformation(const std::string& modelInfo)
     {
         //-------------------------------- 版本信息 --------------------------------
         const InferenceEngine::Version* version = InferenceEngine::GetInferenceEngineVersion();
@@ -783,8 +817,13 @@ namespace space
             InferenceEngine::InputsDataMap inputsInfo = cnnNetwork.getInputsInfo();
             for (const auto& input : inputsInfo)
             {
-                InferenceEngine::SizeVector inputDims = input.second->getTensorDesc().getDims();
-                LOG("INFO") << "\tOutput Name:[" << input.first << "]  Shape:" << inputDims << "  Precision:[" << input.second->getPrecision() << "]" << std::endl;
+                LOG("INFO") << "\tInput Name:[" << input.first << "] " <<
+                    "Shape:" << input.second->getTensorDesc().getDims() << " " <<
+                    "Layout:[" << input.second->getTensorDesc().getLayout() << "] " <<
+                    "Precision:[" << input.second->getPrecision() << "] " <<
+                    "ColorFormat:[" << input.second->getPreProcess().getColorFormat() << "] " <<
+                    "ResizeAlgorithm:[" << input.second->getPreProcess().getResizeAlgorithm() << "] " <<
+                    std::endl;
             }
 
             //------------Output-----------
@@ -792,8 +831,11 @@ namespace space
             InferenceEngine::OutputsDataMap outputsInfo = cnnNetwork.getOutputsInfo();
             for (const auto& output : outputsInfo)
             {
-                InferenceEngine::SizeVector outputDims = output.second->getTensorDesc().getDims();
-                LOG("INFO") << "\tOutput Name:[" << output.first << "]  Shape:" << outputDims << "  Precision:[" << output.second->getPrecision() << "]" << std::endl;
+                LOG("INFO") << "\tOutput Name:[" << output.first << "] " <<
+                    "Shape:" << output.second->getTensorDesc().getDims() << " " <<
+                    "Layout:[" << output.second->getTensorDesc().getLayout() << "] " <<
+                    "Precision:[" << output.second->getPrecision() << "] " <<
+                    std::endl;
             }
 
             std::cout << std::endl;

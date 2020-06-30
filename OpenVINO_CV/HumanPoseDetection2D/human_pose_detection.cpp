@@ -32,6 +32,10 @@ namespace space
     HumanPoseDetection::HumanPoseDetection(bool is_debug):is_debug(is_debug)
     {
     };
+    HumanPoseDetection::HumanPoseDetection(bool is_debug, InferenceEngine::ColorFormat color_format) :
+        is_debug(is_debug), color_format(color_format)
+    {
+    }
     HumanPoseDetection::~HumanPoseDetection()
     {
         if (pBuffer != NULL) UnmapViewOfFile(pBuffer);
@@ -89,18 +93,24 @@ namespace space
     {
         LOG("INFO") << "\t配置网络输入 ... " << std::endl;
         inputsInfo = cnnNetwork.getInputsInfo();
-        inputsInfo.begin()->second->setPrecision(InferenceEngine::Precision::U8);
         inputsInfo.begin()->second->setLayout(InferenceEngine::Layout::NHWC);
+        inputsInfo.begin()->second->setPrecision(InferenceEngine::Precision::U8);
+        inputsInfo.begin()->second->getPreProcess().setColorFormat(color_format);
         inputsInfo.begin()->second->getPreProcess().setResizeAlgorithm(InferenceEngine::ResizeAlgorithm::RESIZE_BILINEAR);
-        
-        inputsInfo.begin()->second->getPreProcess().setColorFormat(InferenceEngine::ColorFormat::I420);
 
         //print inputs info
+        //LOG("INFO") << "\t" << inputsInfo;
         for (const auto& input : inputsInfo)
         {
-            InferenceEngine::SizeVector inputDims = input.second->getTensorDesc().getDims();
-            LOG("INFO") << "\tInput Name:[" << input.first << "]  Shape:" << inputDims << "  Precision:[" << input.second->getPrecision() << "]" << " ColorFormat:" << input.second->getPreProcess().getColorFormat() << std::endl;
+            LOG("INFO") << "\tInput Name:[" << input.first << "] " <<
+                "Shape:" << input.second->getTensorDesc().getDims() << " " <<
+                "Layout:[" << input.second->getTensorDesc().getLayout() << "] " <<
+                "Precision:[" << input.second->getPrecision() << "] " <<
+                "ColorFormat:[" << input.second->getPreProcess().getColorFormat() << "] " <<
+                "ResizeAlgorithm:[" << input.second->getPreProcess().getResizeAlgorithm() << "] " <<
+                std::endl;
         }
+        
 
         //默认支持一层输入，子类可以更改为多层输入
         //多层输入以输入层名.bin文件指向
@@ -111,7 +121,6 @@ namespace space
             throw std::logic_error("当前模块只支持一个网络层的输入 ... ");
         }
 
-
         LOG("INFO") << "\t配置网络输出  ... " << std::endl;
         outputsInfo = cnnNetwork.getOutputsInfo();
         outputsInfo.begin()->second->setPrecision(InferenceEngine::Precision::FP32);
@@ -120,10 +129,14 @@ namespace space
                 output_layers.push_back(output.first);
 
         //print outputs info
+        //LOG("INFO") << "\t" << outputsInfo;
         for (const auto& output : outputsInfo)
         {
-            InferenceEngine::SizeVector outputDims = output.second->getTensorDesc().getDims();
-            LOG("INFO") << "\tOutput Name:[" << output.first << "]  Shape:" << outputDims << "  Precision:[" << output.second->getPrecision() << "]" << std::endl;
+            LOG("INFO") << "\tOutput Name:[" << output.first << "] " <<
+                "Shape:" << output.second->getTensorDesc().getDims() << " " <<
+                "Layout:[" << output.second->getTensorDesc().getLayout() << "] " <<
+                "Precision:[" << output.second->getPrecision() << "] " <<
+                std::endl;
         }
 
         //输出调试标题
@@ -172,7 +185,7 @@ namespace space
     {
         if (!is_configuration)
             throw std::logic_error("未配置网络对象，不可操作 ...");
-        if (frame.empty() || frame.type() != CV_8UC3)
+        if (frame.empty())// || frame.type() != CV_8UC3)
             throw std::logic_error("输入图像帧不能为空帧对象，CV_8UC3 类型 ... ");
 
         frame_ptr = frame;
@@ -216,7 +229,7 @@ namespace space
         requestPtr->StartAsync();
         t0 = std::chrono::high_resolution_clock::now();
     }
-
+/*
     void HumanPoseDetection::RequestInfer(const std::string& name)
     {
         InferenceEngine::StatusCode code;
@@ -282,6 +295,7 @@ namespace space
         requestPtr->StartAsync();
         t0 = std::chrono::high_resolution_clock::now();
     }
+    */
 
     std::vector<HumanPose> HumanPoseDetection::extractPoses(const std::vector<cv::Mat>& heatMaps, const std::vector<cv::Mat>& pafs) const 
     {
@@ -333,7 +347,7 @@ namespace space
 
     void HumanPoseDetection::RenderHumanPose(const std::vector<HumanPose>& poses, cv::Mat& image)
     {
-        CV_Assert(image.type() == CV_8UC3);
+        //CV_Assert(image.type() == CV_8UC3);
 
         static const cv::Scalar colors[keypointsNumber] = {
             cv::Scalar(255, 0, 0), cv::Scalar(255, 85, 0), cv::Scalar(255, 170, 0),
@@ -405,10 +419,6 @@ namespace space
         const float* heatMapsData = heatMapsBlob->buffer().as<float*>();
         const float* pafsData = pafsBlob->buffer().as<float*>();
 
-#if _DEBUG
-        std::cout << "Address:" << (void*)heatMapsData << std::endl;
-#endif
-
         int offset = heatMapDims[2] * heatMapDims[3];
         int nPafs = pafsBlob->getTensorDesc().getDims()[1];
 
@@ -432,7 +442,6 @@ namespace space
         poses = extractPoses(heatMaps, pafs);
         correctCoordinates(poses, heatMaps[0].size(), frame_ptr.size());
 
-        LOG("INFO") << poses.size() << std::endl;
         ConvertToSharedXML(poses, "pose2d_output.bin");
     }
     

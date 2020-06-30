@@ -29,11 +29,11 @@ int main(int argc, char **argv)
     args.add("help", 'h', "参数说明");
     args.add("info", 0, "Inference Engine Infomation");
 
-    args.add<std::string>("input", 'i', "输入源参数，格式：(video|camera|shared)[:value[:value[:...]]]", false, "camera:0:1920x1080");
+    args.add<std::string>("input", 'i', "输入源参数，格式：(video|camera|shared)[:value[:value[:...]]]", false, "camera:0:1280x720");// "shared:sharedMemory");
     //args.add<std::string>("output_layer_names", 'o', "多层网络输出参数，单层使用默认输出，网络层名称，以':'分割，"
     //    "区分大小写，格式：layerName:layerName:...", false, "Mconv7_stage2_L1:Mconv7_stage2_L2");
     args.add<std::string>("model", 'm', "用于 AI识别检测 的 网络模型名称/文件(.xml)和目标设备，格式：(AI模型名称)[:精度[:硬件]]，"
-        "示例：human-pose-estimation-0001:FP32:CPU 或 human-pose-estimation-0001:FP16:GPU", false, "human-pose-estimation-0001:FP16:CPU");
+        "示例：human-pose-estimation-0001:FP32:CPU 或 human-pose-estimation-0001:FP16:GPU", false, "human-pose-estimation-0001:FP32:CPU");
 
     //args.add<bool>("reshape", 'r', "重塑输入层，使输入源内存映射到网络输入层实现共享内存数据，不进行数据源缩放和拷贝", false, true);
 
@@ -78,15 +78,20 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
+    inputSource.read(frame);
+    if (frame.channels() == 1)
+    {
+        LOG("ERROR") << "Frame Channels  ... " << std::endl;
+        return EXIT_FAILURE;
+    }
+
     try
     {
         InferenceEngine::Core ie;
-        HumanPoseDetection detector(false);
+        HumanPoseDetection detector(show, frame.channels() == 4 ? InferenceEngine::ColorFormat::BGRX : InferenceEngine::ColorFormat::BGR);
         detector.ConfigNetwork(ie, args.get<std::string>("model"));
 
-        inputSource.read(frame);
         detector.RequestInfer(frame);
-        //detector.RequestInfer("shared");
 
         std::stringstream title;
         title << "[Source] Human Pose Detection [" << model["full"] << "]";
@@ -97,39 +102,37 @@ int main(int argc, char **argv)
 
         int delay = WaitKeyDelay;
         double frame_use_time = 0.0f;
-        auto t0 = std::chrono::high_resolution_clock::now();
-        auto t1 = std::chrono::high_resolution_clock::now();
+        auto t0 = hc::now();
+        auto t1 = hc::now();
 
         while (true)
         {
             if (!IsRunning) break;
-            t0 = std::chrono::high_resolution_clock::now();
+            t0 = hc::now();
 
             use_time.str("");
             use_time << "Infer/Frame Use Time:" << detector.GetInferUseTime() << "/" << frame_use_time << "ms  FPS:" << detector.GetFPS();
             std::cout << "\33[2K\r[ INFO] " << use_time.str();
 
-            if (show)
-            {
-                cv::imshow(title.str(), frame);
-            }
+#ifdef _DEBUG
+            cv::imshow(title.str(), frame);
+#endif
 
             if (!inputSource.read(frame))
             {
-                LOG("WARN") << "读取数据帧失败 ... " << std::endl;
+                //LOG("WARN") << "读取数据帧失败 ... " << std::endl;
                 Sleep(15);
                 continue;
             }
 
-            detector.RequestInfer(frame);
-            //detector.RequestInfer("shared");
+            //detector.RequestInfer(frame);
 
-            t1 = std::chrono::high_resolution_clock::now();
+            t1 = hc::now();
             frame_use_time = std::chrono::duration_cast<ms>(t1 - t0).count();
 
             delay = WaitKeyDelay - frame_use_time;
             if (delay <= 0) delay = 1;
-
+            
             cv::waitKey(delay);
         }
     }
