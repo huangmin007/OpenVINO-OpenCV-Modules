@@ -2,28 +2,30 @@
 
 #include <iostream>
 #include <Windows.h>
-
+#include <shared_mutex>
 #include <opencv2/opencv.hpp>
 #include <inference_engine.hpp>
 
-#include "open_model_infer.hpp"
+#include <cmdline.h>
+#include <timer.hpp>
+#include <static_functions.hpp>
 
 namespace space
 {
-
-#pragma region ObjectDetection
 	/// <summary>
 	/// Object Detection 对象检测 (Open Model Zoo)
 	/// </summary>
-	class ObjectDetection : public OpenModelInferBase
+	class ObjectDetection
 	{
 	public:
 		// 对象检测配置参数
-		struct Params2
+		struct Params
 		{
-			std::string model;
-			std::string device;
+		public:
 			InferenceEngine::Core ie;
+
+			std::string model;
+			std::string device = "CPU";
 			std::map<std::string, std::string> ie_config;
 
 			bool is_async = true;		//异步推断
@@ -38,14 +40,60 @@ namespace space
 			float confidence = 0.5f;						//可置信阈值
 			std::vector<std::string> labels;				//对象标签
 
-			friend std::ostream& operator << (std::ostream& stream, const Params2& params)
+			void Parse(const cmdline::parser& args)
 			{
-				stream << "[Params Async:" << params.is_async <<
+				std::map<std::string, std::string> model_info = ParseArgsForModel(args.get<std::string>("model"));
+
+				model = model_info["path"];
+				device = model_info["device"];
+				is_reshape = args.get<bool>("reshape");
+				confidence = args.get<float>("conf");
+				output_layers = SplitString(args.get<std::string>("output_layers"), ':');
+			}
+
+			bool Check()
+			{
+				if (model.empty())
+				{
+					throw std::invalid_argument("网络模型不能为空.");
+					return false;
+				}
+				if (batch_count < 1)
+				{
+					throw std::invalid_argument("Batch Count 不能小于 1 .");
+					return false;
+				}
+				if (infer_count < 1)
+				{
+					throw std::invalid_argument("Infer Request 数量不能小于 1 .");
+					return false;
+				}
+
+				return true;
+			}
+			
+			void UpdateIEConfig()
+			{
+				if (batch_count > 1)
+					ie_config[InferenceEngine::PluginConfigParams::KEY_DYN_BATCH_ENABLED] = InferenceEngine::PluginConfigParams::YES;
+				
+				if (infer_count > 1)
+					ie_config[InferenceEngine::PluginConfigParams::KEY_CPU_BIND_THREAD] = InferenceEngine::PluginConfigParams::NO;
+			}
+
+			explicit Params() {};
+			explicit Params(InferenceEngine::Core ie) :ie(ie) {};
+
+			friend std::ostream& operator << (std::ostream& stream, const Params& params)
+			{
+				stream << std::boolalpha << "[Params" <<
+					" Async:" << params.is_async <<
 					" Reshape:" << params.is_reshape <<
 					" BatchCount:" << params.batch_count <<
 					" InferCount:" << params.infer_count <<
 					" MappingBlob:" << params.is_mapping_blob <<
-					" OutputLayers:" << params.output_layers << "]";
+					//" OutputLayers:" << params.output_layers << 
+					"]";
 
 				return stream;
 			};
@@ -75,16 +123,15 @@ namespace space
 		/// <param name="output_layers_name">多层的网络输出名称</param>
 		/// <param name="is_debug"></param>
 		/// <returns></returns>
-		//ObjectDetection(bool is_show = true);
-		ObjectDetection(const std::vector<std::string>& output_layers_name, bool is_debug = true);
+		ObjectDetection(bool is_show = true);
 		~ObjectDetection();
 
-#if 0
 		/// <summary>
 		/// 配置网络
 		/// </summary>
 		/// <param name="params"></param>
-		void ConfigNetwork(const Params2 params);
+		void ConfigNetwork(const Params& params);
+
 		/// <summary>
 		/// 异步推断请求，需实时提交图像帧；当 is_reshape 为 true 时只需调用一次，多次调用也不影响
 		/// </summary>
@@ -110,66 +157,76 @@ namespace space
 			std::shared_lock<std::shared_mutex> lock(_fps_mutex);
 			return fps;
 		}
-#endif
-
-		/// <summary>
-		/// 设置其它参数
-		/// </summary>
-		/// <param name="confidence_threshold">信任阈值</param>
-		/// <param name="labels">对象标签</param>
-		void SetParameters(const OpenModelInferBase::Params& params, float confidence_threshold, const std::vector<std::string> labels);
 
 		static void DrawObjectBound(cv::Mat frame, const std::vector<ObjectDetection::Result>& results, const std::vector<std::string>& labels);
 
 	protected:
-		void ParsingOutputData(InferenceEngine::IInferRequest::Ptr request, InferenceEngine::StatusCode status) override;
-		void UpdateDebugShow() override;
+		/// <summary>
+		/// 设置网络IO
+		/// </summary>
+		virtual void SetNetworkIO();
+		
+		/// <summary>
+		/// 设置推断请求异步回调
+		/// </summary>
+		virtual void SetInferCallback();
+
+		/// <summary>
+		/// 解析指定的输出层数据；也可做是二次输入/输出，或是调试显示输出
+		/// <param> 如果要在类内部解析，在子类内实现该函数；如果在类外部解析设置回调函数 SetCompletionCallback </param>
+		/// </summary>
+		virtual void ParsingOutputData(InferenceEngine::IInferRequest::Ptr request, InferenceEngine::StatusCode status);
+
+		/// <summary>
+		/// 更新调试并显示，该函数是用于子类做输出显示的
+		/// </summary>
+		virtual void UpdateDebugShow();
+
+		Params params;
+		bool is_configuration = false;		//是否已经设置网络配置
+		std::vector<std::tuple<std::string, HANDLE, LPVOID>> shared_layers;	//内存共享输出层
+
+		//引用输入的帧对象，主要是需要帧的宽，高，通道，类型、数据指针信息，浅拷贝对象
+		cv::Mat frame_ptr;
+
+		bool is_show = true;			//是否输出部份调试信息
+		cv::Mat show_frame;				//用于渲染显示帧，深度拷贝对象
+		std::stringstream title;		//调试输出窗口标题
+
+
+		//CNN 网络对象
+		InferenceEngine::CNNNetwork cnnNetwork;
+		//可执行网络对象
+		InferenceEngine::ExecutableNetwork execNetwork;
+		//输入层数据信息
+		InferenceEngine::InputsDataMap inputsInfo;
+		//输出层数据信息
+		InferenceEngine::OutputsDataMap outputsInfo;
+		// 推断请求对象
+		std::vector<InferenceEngine::InferRequest::Ptr> requestPtrs;
+
+
+		//用于测量的计时器
+		Timer timer;
+		//FPS
+		size_t fps = 0;
+		size_t fps_count = 0;
+		std::shared_mutex _fps_mutex;
+
+		//获取到推断结果所耗时间
+		double infer_use_time = 0.0f;
+		std::shared_mutex _time_mutex;
+		std::chrono::steady_clock::time_point t0;
+		std::chrono::steady_clock::time_point t1;
 
 	private:
-		//[1x1xNx7] FP32
-		void PasingO1D1x1xNx7(InferenceEngine::IInferRequest::Ptr request);
 		//[Nx5][N]
 		void PasingO2DNx5(InferenceEngine::IInferRequest::Ptr request);
+		//[1x1xNx7] FP32
+		void PasingO1D1x1xNx7(InferenceEngine::IInferRequest::Ptr request);
 
 		float scaling = 1.2;
-		cv::Mat debug_frame;
-		std::vector<std::string> labels;
-		float confidence_threshold = 0.5f;
-
-
-		//std::vector<ObjectRecognition*> sub_network;
 		std::vector<ObjectDetection::Result> results;
 	};
-#pragma endregion
 
-#pragma region ObjectRecognition
-	/// <summary>
-	/// Object Recognition 对象识别 (Open Model Zoo)
-	/// </summary>
-	class ObjectRecognition : public OpenModelInferBase
-	{
-	public:
-		ObjectRecognition(const std::vector<std::string>& output_layers_name, bool is_debug = true);
-		~ObjectRecognition();
-
-		void RequestInfer(const cv::Mat& frame, const std::vector<ObjectDetection::Result> results);
-
-
-	protected:
-		void ParsingOutputData(InferenceEngine::IInferRequest::Ptr request, InferenceEngine::StatusCode status) override;
-		void UpdateDebugShow() override;
-
-		void SetInferCallback() override;
-
-	private:
-		cv::Mat prev_frame;
-		std::vector<ObjectDetection::Result> results;
-		//std::vector<ObjectDetection::Result> prev_results;
-
-
-		std::string title = "";
-
-		std::vector<float> last_fv;
-	};
-#pragma endregion
 };

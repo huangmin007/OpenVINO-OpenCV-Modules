@@ -26,7 +26,7 @@ int main(int argc, char** argv)
     args.add("info", 0, "Inference Engine Infomation");
 
     args.add<std::string>("input", 'i', "输入源参数，格式：(video|camera|shared)[:value[:value[:...]]]", false, "shared:od_source.bin");
-    args.add<std::string>("input_shared", 0, "输入共享内存名称", false, "527");
+    args.add<std::string>("input_shared", 0, "输入共享内存名称", false, "detection_out");
 
     args.add<std::string>("model", 'm', "用于 AI识别检测 的 网络模型名称/文件(.xml)和目标设备，格式：(AI模型名称)[:精度[:硬件]]，", false,
         "facial-landmarks-35-adas-0002:FP32:CPU"); //facial-landmarks-35-adas-0002 , landmarks-regression-retail-0009
@@ -50,7 +50,7 @@ int main(int argc, char** argv)
     }
     if (args.exist("info"))
     {
-        InferenceEngineInfomation(args.get<std::string>("model"));
+        InferenceEngineInformation(args.get<std::string>("model"));
         return EXIT_SUCCESS;
     }
     if (!isParser)

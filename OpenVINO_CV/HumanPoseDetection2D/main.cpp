@@ -9,6 +9,8 @@
 #include <input_source.hpp>
 #include <static_functions.hpp>
 
+#include <ie_compound_blob.h>
+
 #include "cmdline.h"
 
 using namespace space;
@@ -27,13 +29,13 @@ int main(int argc, char **argv)
     args.add("help", 'h', "参数说明");
     args.add("info", 0, "Inference Engine Infomation");
 
-    args.add<std::string>("input", 'i', "输入源参数，格式：(video|camera|shared)[:value[:value[:...]]]", false, "cam:0:1920x1080");
-    args.add<std::string>("output_layer_names", 'o', "多层网络输出参数，单层使用默认输出，网络层名称，以':'分割，"
-        "区分大小写，格式：layerName:layerName:...", false, "Mconv7_stage2_L1:Mconv7_stage2_L2");
+    args.add<std::string>("input", 'i', "输入源参数，格式：(video|camera|shared)[:value[:value[:...]]]", false, "camera:0:1920x1080");
+    //args.add<std::string>("output_layer_names", 'o', "多层网络输出参数，单层使用默认输出，网络层名称，以':'分割，"
+    //    "区分大小写，格式：layerName:layerName:...", false, "Mconv7_stage2_L1:Mconv7_stage2_L2");
     args.add<std::string>("model", 'm', "用于 AI识别检测 的 网络模型名称/文件(.xml)和目标设备，格式：(AI模型名称)[:精度[:硬件]]，"
-        "示例：human-pose-estimation-0001:FP32:CPU 或 human-pose-estimation-0001:FP16:GPU", false, "human-pose-estimation-0001:FP32:CPU");
+        "示例：human-pose-estimation-0001:FP32:CPU 或 human-pose-estimation-0001:FP16:GPU", false, "human-pose-estimation-0001:FP16:CPU");
 
-    args.add<bool>("reshape", 'r', "重塑输入层，使输入源内存映射到网络输入层实现共享内存数据，不进行数据源缩放和拷贝", false, true);
+    //args.add<bool>("reshape", 'r', "重塑输入层，使输入源内存映射到网络输入层实现共享内存数据，不进行数据源缩放和拷贝", false, true);
 
 #ifdef _DEBUG
     args.add<bool>("show", 0, "是否显示视频窗口，用于调试", false, true);
@@ -52,7 +54,7 @@ int main(int argc, char **argv)
     }
     if (args.exist("info"))
     {
-        InferenceEngineInfomation(args.get<std::string>("model"));
+        InferenceEngineInformation(args.get<std::string>("model"));
         return EXIT_SUCCESS;
     }
     if (!isParser)
@@ -62,9 +64,9 @@ int main(int argc, char **argv)
     }
 
     bool show = args.get<bool>("show");
-    bool reshape = args.get<bool>("reshape");
+    //bool reshape = args.get<bool>("reshape");
     std::map<std::string, std::string> model = ParseArgsForModel(args.get<std::string>("model"));
-    std::vector<std::string> output_layer_names = SplitString(args.get<std::string>("output_layer_names"), ':');
+    //std::vector<std::string> output_layer_names = SplitString(args.get<std::string>("output_layer_names"), ':');
 
 #pragma endregion
     cv::Mat frame;
@@ -79,12 +81,12 @@ int main(int argc, char **argv)
     try
     {
         InferenceEngine::Core ie;
-        HumanPoseDetection detector(output_layer_names, show);
-        //detector.SetParameters({ 1, 1, true, {} });
-        detector.ConfigNetwork(ie, args.get<std::string>("model"), reshape);
+        HumanPoseDetection detector(false);
+        detector.ConfigNetwork(ie, args.get<std::string>("model"));
 
         inputSource.read(frame);
         detector.RequestInfer(frame);
+        //detector.RequestInfer("shared");
 
         std::stringstream title;
         title << "[Source] Human Pose Detection [" << model["full"] << "]";
@@ -120,6 +122,7 @@ int main(int argc, char **argv)
             }
 
             detector.RequestInfer(frame);
+            //detector.RequestInfer("shared");
 
             t1 = std::chrono::high_resolution_clock::now();
             frame_use_time = std::chrono::duration_cast<ms>(t1 - t0).count();

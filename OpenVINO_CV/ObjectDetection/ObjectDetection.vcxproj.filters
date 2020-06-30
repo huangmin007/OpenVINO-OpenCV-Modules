@@ -21,9 +21,6 @@
     <ClCompile Include="object_detection.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="object_recognition.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="object_detection.hpp">

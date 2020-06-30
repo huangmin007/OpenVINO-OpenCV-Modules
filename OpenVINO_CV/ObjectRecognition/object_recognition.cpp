@@ -1,6 +1,7 @@
 #include "object_recognition.hpp"
 #include <static_functions.hpp>
 #include <samples/ocv_common.hpp>
+
 namespace space
 {
 	ObjectRecognition::ObjectRecognition(const std::vector<std::string>& input_shared, const std::vector<std::string>& output_layers, bool is_debug)

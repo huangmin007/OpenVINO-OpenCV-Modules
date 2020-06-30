@@ -35,7 +35,7 @@ int main(int argc, char** argv)
 
     args.add<std::string>("input", 'i', "输入源参数，格式：(video|camera|shared)[:value[:value[:...]]]", false, "camera:0:1280x720");
     args.add<std::string>("model", 'm', "用于 AI识别检测 的 网络模型名称/文件(.xml)和目标设备，格式：(AI模型名称)[:精度[:硬件]]，"
-        "示例：face-detection-adas-0001:FP32:CPU 或 face-detection-adas-0001:FP16:GPU", false, "face-detection-retail-0005:FP32:CPU");
+        "示例：face-detection-adas-0001:FP32:CPU 或 face-detection-adas-0001:FP16:GPU", false, "face-detection-retail-0044:FP32:CPU");
     //face-detection-adas-0001,person-detection-retail-0013,face-detection-0105,boxes/Split.0:labels
     args.add<std::string>("output_layers", 'o', "(output layer names)多层网络输出参数，单层使用默认输出，网络层名称，以':'分割，区分大小写，格式：layerName:layerName:...", false, "");
     args.add<float>("conf", 'c', "检测结果的置信度阈值(confidence threshold)", false, 0.5);
@@ -64,7 +64,7 @@ int main(int argc, char** argv)
     }
     if (args.exist("info"))
     {
-        InferenceEngineInfomation(args.get<std::string>("model"));
+        InferenceEngineInformation(args.get<std::string>("model"));
         return EXIT_SUCCESS;
     }
     if (!isParser)
@@ -114,11 +114,12 @@ int main(int argc, char** argv)
     {
         InferenceEngine::Core ie;
 
+        ObjectDetection::Params params(ie);
+        params.Parse(args);
+
         //Parent
-        ObjectDetection detector(output_layers, show);
-        detector.SetParameters({1,1,true}, conf, labels);
-        detector.ConfigNetwork(ie, args.get<std::string>("model"), reshape);
-        //detector.ConfigNetwork(ie, "models\\A_Test\\mobilenet_v1_0.25_128_frozen.xml", "CPU", !reshape);
+        ObjectDetection detector(show);
+        detector.ConfigNetwork(params);
 
 #if G_OBJECT
         //Sub

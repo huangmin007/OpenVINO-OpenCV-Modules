@@ -149,7 +149,6 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="object_detection.cpp" />
-    <ClCompile Include="object_recognition.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="object_detection.hpp" />

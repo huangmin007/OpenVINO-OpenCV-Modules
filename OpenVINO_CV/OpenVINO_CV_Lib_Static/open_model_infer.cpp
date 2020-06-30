@@ -4,6 +4,7 @@
 #include <typeinfo>
 #include <shared_mutex>
 
+
 namespace space
 {
 	OpenModelInferBase::OpenModelInferBase(const std::vector<std::string>& output_layers, bool is_debug)
@@ -118,6 +119,7 @@ namespace space
 			inputsInfo.begin()->second->setLayout(InferenceEngine::Layout::NCHW);
 			inputsInfo.begin()->second->getPreProcess().setResizeAlgorithm(InferenceEngine::ResizeAlgorithm::RESIZE_BILINEAR);
 		}
+		//inputsInfo.begin()->second->getPreProcess().setColorFormat(InferenceEngine::ColorFormat::I420);
 
 		//print inputs info
 		for (const auto& input : inputsInfo)
@@ -246,9 +248,9 @@ namespace space
 				//	MemorySharedBlob(requestPtrs[0], output_shared_layers.back(), SHARED_RESERVE_BYTE_SIZE);
 
 				//多个推断对象，输出映射到同一个共享位置？？
-				if (is_mapping_blob)
-					for (auto& requestPtr : requestPtrs)
-						MemorySharedBlob(requestPtr, output_shared_layers.back(), SHARED_RESERVE_BYTE_SIZE);
+				//if (is_mapping_blob)
+					//for (auto& requestPtr : requestPtrs)
+						//MemorySharedBlob(requestPtr, output_shared_layers.back(), SHARED_RESERVE_BYTE_SIZE);
 
 				//LOG("INGO") << "共享内存 " << shared.first << " 映射：" << std::boolalpha << is_mapping_blob << std::endl;
 			}
@@ -312,5 +314,6 @@ namespace space
 		//requestPtr->SetBatch(batch_size);
 		requestPtr->StartAsync();
 		t0 = std::chrono::high_resolution_clock::now();
-	}
+	};
+
 }

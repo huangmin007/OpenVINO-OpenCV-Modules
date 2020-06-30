@@ -57,7 +57,7 @@ int main(int argc, char** argv)
     }
     if (args.exist("info"))
     {
-        InferenceEngineInfomation(args.get<std::string>("model"));
+        //InferenceEngineInformation(args.get<std::string>("model"));
         return EXIT_SUCCESS;
     }
     if (!isParser)
